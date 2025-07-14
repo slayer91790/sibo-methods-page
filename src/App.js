@@ -221,7 +221,6 @@ const EvidenceTierBadge = ({ tier }) => {
     );
 };
 
-// --- New Component for Tier Explanations ---
 const EvidenceTierExplanation = () => {
     const tiersData = [
         { tier: 1, title: 'Tier 1: Strong Evidence', description: 'Backed by high-quality scientific research, such as double-blind, randomized controlled trials (RCTs). These are considered the "gold standard" in medical research.' },
@@ -242,6 +241,33 @@ const EvidenceTierExplanation = () => {
                         <div>
                             <h4 className="font-semibold text-gray-700">{tierItem.title}</h4>
                             <p className="text-gray-600 text-sm">{tierItem.description}</p>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+// --- New Component for AI Pattern Analysis ---
+const AiPatternAnalysis = () => {
+    const patterns = [
+        { title: "Two-Phase Strategy: Eradicate then Prevent", description: "Nearly all successful protocols involve an initial 'kill phase' (using antibiotics, herbals, or an elemental diet) followed by a crucial long-term 'prevention phase' to stop SIBO from returning." },
+        { title: "Motility is King: The Prokinetic Pattern", description: "Restoring the gut's natural cleansing wave (the Migrating Motor Complex or MMC) is the most consistent theme. Prokinetics like ginger & artichoke or prescription options are key for long-term success." },
+        { title: "The 'Top-Down' Approach: Supporting the Full System", description: "Many methods recognize SIBO as a symptom of a larger digestive issue. Supporting stomach acid (Betaine HCL) and bile flow ensures food is properly broken down before it can feed an overgrowth." },
+        { title: "Strategic Use of Diet", description: "Diet (like Low FODMAP) is used as a temporary tool to manage symptoms and support the kill phase, not as a standalone cure. Meal spacing (4-5 hours between meals) is also emphasized to allow the MMC to work." },
+    ];
+
+    return (
+        <div className="max-w-4xl mx-auto mt-16 p-6 bg-indigo-50 rounded-xl shadow-md border border-indigo-200">
+            <h2 className="text-2xl font-bold text-indigo-800 text-center mb-6">AI Pattern Analysis: Common Themes in SIBO Recovery</h2>
+            <ul className="space-y-4">
+                {patterns.map(pattern => (
+                    <li key={pattern.title} className="flex items-start">
+                         <svg className="flex-shrink-0 h-6 w-6 text-indigo-500 mr-3 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                        <div>
+                            <h4 className="font-semibold text-indigo-700">{pattern.title}</h4>
+                            <p className="text-indigo-600 text-sm">{pattern.description}</p>
                         </div>
                     </li>
                 ))}
@@ -304,6 +330,7 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes }) =
                     />
                 ))}
             </div>
+            <AiPatternAnalysis />
             <EvidenceTierExplanation />
              <footer className="text-center mt-12 text-gray-500 text-sm px-4">
                 <p>Disclaimer: This information is for educational purposes only and is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment.</p>
