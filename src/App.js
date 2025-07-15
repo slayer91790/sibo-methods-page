@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 const siboMethodsData = [
     {
         id: 2,
-        title: "Method 2: The Rifaximin-Based Pharmaceutical Protocol",
+        title: "Rifaximin (Pharmaceutical) Protocol",
         summary: "Utilizes the prescription antibiotic Rifaximin, often in combination with another antibiotic for methane-dominant SIBO, as the primary means of eradicating the bacterial overgrowth.",
         evidenceTier: 1,
         citation: {
@@ -33,7 +33,7 @@ const siboMethodsData = [
     },
     {
         id: 1,
-        title: "Method 1: The Herbal Antimicrobial Approach",
+        title: "Herbal Antimicrobial Protocol",
         summary: "Focuses on using natural compounds with antimicrobial properties to reduce bacterial overgrowth in the small intestine. Often favored by those seeking a less aggressive alternative to prescription antibiotics.",
         evidenceTier: 2,
         citation: {
@@ -66,7 +66,7 @@ const siboMethodsData = [
     },
     {
         id: 3,
-        title: "Method 3: The Elemental Diet",
+        title: "The Elemental Diet",
         summary: "A more intensive, short-term approach that involves consuming a liquid-only diet of pre-digested nutrients to starve bacteria while nourishing the individual.",
         evidenceTier: 2,
         citation: {
@@ -99,7 +99,7 @@ const siboMethodsData = [
     },
     {
         id: 7,
-        title: "Method 7: Operation: Kill SIBO (Multi-Phased Attack)",
+        title: "Aggressive Multi-Phase Protocol",
         summary: "An aggressive protocol for stubborn SIBO. It operates on a multi-pronged, rotational attack using the elemental diet, pharmaceuticals, and herbals to prevent microbial resistance.",
         evidenceTier: 3,
         citation: {
@@ -133,7 +133,7 @@ const siboMethodsData = [
     },
     {
         id: 5,
-        title: "Method 5: The Intestinal Transit-Focused Protocol",
+        title: "Intestinal Transit & Motility Protocol",
         summary: "Centers on the core belief that SIBO is fundamentally a problem of slow intestinal transit. The primary goal is to speed up digestion and motility.",
         evidenceTier: 3,
         citation: {
@@ -166,7 +166,7 @@ const siboMethodsData = [
     },
     {
         id: 6,
-        title: "Method 6: The Colon Hydrotherapy and Digestive Reset Protocol",
+        title: "Colon Hydrotherapy & Digestive Reset",
         summary: "Posits that the root cause can be old fecal deposits. The core of the treatment is to physically clean the colon while rebuilding healthy digestive habits.",
         evidenceTier: 0, // Special tier for "No Evidence / Caution"
         citation: {
@@ -249,7 +249,6 @@ const EvidenceTierExplanation = () => {
     );
 };
 
-// --- New Component for AI Pattern Analysis ---
 const AiPatternAnalysis = () => {
     const patterns = [
         { title: "Two-Phase Strategy: Eradicate then Prevent", description: "Nearly all successful protocols involve an initial 'kill phase' (using antibiotics, herbals, or an elemental diet) followed by a crucial long-term 'prevention phase' to stop SIBO from returning." },
