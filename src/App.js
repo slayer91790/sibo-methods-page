@@ -11,6 +11,15 @@ const siboMethodsData = [
             text: "A landmark 2010 double-blind, placebo-controlled trial demonstrating the efficacy of Rifaximin for non-constipation IBS, which has significant overlap with SIBO.",
             url: "https://pubmed.ncbi.nlm.nih.gov/21182358/"
         },
+        sampleDay: {
+            title: "A Sample Day During the Rifaximin Protocol",
+            schedule: [
+                { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
+                { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
+                { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
+                { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
+            ]
+        },
         protocol: [
             {
                 phase: "Phase 1: Antibiotic Treatment (14-day course)",
@@ -39,6 +48,15 @@ const siboMethodsData = [
         citation: {
             text: "A 2014 study showing herbal therapy (Candibactin-AR and Candibactin-BR) is as effective as Rifaximin for SIBO resolution in a non-controlled trial.",
             url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4030608/"
+        },
+        sampleDay: {
+            title: "A Sample Day During the Herbal Protocol",
+            schedule: [
+                { time: "Morning (8 AM)", action: "Take first dose of herbal antimicrobials (e.g., Berberine, Oregano Oil) with a low-FODMAP breakfast. Take biofilm disruptor 30 minutes prior on an empty stomach." },
+                { time: "Afternoon (2 PM)", action: "Low-FODMAP lunch. Ensure 4-5 hours of spacing between meals." },
+                { time: "Evening (8 PM)", action: "Take second dose of herbal antimicrobials with a low-FODMAP dinner. Take biofilm disruptor 30 minutes prior." },
+                { time: "Bedtime (10 PM)", action: "Take prokinetic (e.g., Ginger & Artichoke) on an empty stomach, at least 2 hours after dinner." }
+            ]
         },
         protocol: [
             {
@@ -73,6 +91,13 @@ const siboMethodsData = [
             text: "A pilot study from 2004 showing an 80% success rate in normalizing SIBO breath tests after a 14-day elemental diet.",
             url: "https://pubmed.ncbi.nlm.nih.gov/14992438/"
         },
+        sampleDay: {
+            title: "A Sample Day During the Elemental Diet",
+            schedule: [
+                { time: "Throughout the Day", action: "Sip the elemental formula slowly and continuously. Aim to consume the total daily amount spread out over many hours. No other food or drink is consumed except for water." },
+                { time: "Flavoring", action: "If flavor is needed, only use a small amount of pure stevia or monk fruit extract. Avoid any other additives." }
+            ]
+        },
         protocol: [
             {
                 phase: "Phase 1: The Elemental Diet (14-21 days)",
@@ -98,6 +123,35 @@ const siboMethodsData = [
         ]
     },
     {
+        id: 4,
+        title: "Probiotic and Prokinetic Protocol",
+        summary: "Emphasizes the combination of a specific probiotic with a prokinetic to manage symptoms and restore gut function, particularly in cases linked to post-infectious IBS.",
+        evidenceTier: 3,
+        citation: {
+            text: "This protocol is based on a user's experience. While specific probiotics and prokinetics have been studied individually, this particular combination is anecdotal.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day on the Probiotic/Prokinetic Protocol",
+            schedule: [
+                { time: "Morning (with breakfast)", action: "Take one dose of the chosen probiotic (e.g., KefirLabs coconut shot)." },
+                { time: "Between Meals", action: "Maintain meal spacing of 4-5 hours with no snacking to support motility." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., 2mg prucalopride) on an empty stomach, at least 2-3 hours after the last meal." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Daily Regimen (Post-Antibiotic or Maintenance)",
+                steps: [
+                    { title: "Prerequisite", description: "This user began this protocol a couple of weeks after a course of Rifaximin. It may be considered a post-antibiotic or maintenance strategy." },
+                    { title: "Probiotic", description: "One KefirLabs brand coconut creamy probiotic shot taken daily with breakfast." },
+                    { title: "Prokinetic", description: "2mg of prucalopride taken nightly to improve gut motility." },
+                    { title: "Diet", description: "The user reported being able to return to a normal diet with minimal discomfort while on this protocol." }
+                ]
+            }
+        ]
+    },
+    {
         id: 7,
         title: "Aggressive Multi-Phase Protocol",
         summary: "An aggressive protocol for stubborn SIBO. It operates on a multi-pronged, rotational attack using the elemental diet, pharmaceuticals, and herbals to prevent microbial resistance.",
@@ -105,6 +159,15 @@ const siboMethodsData = [
         citation: {
             text: "This is a community-derived protocol based on anecdotal reports. It combines several methods (Elemental, Pharmaceutical, Herbal) which have individual scientific backing (see other methods). The combined protocol itself has not been studied.",
             url: null
+        },
+        sampleDay: {
+            title: "A Sample Day (Example during Herbal Phase)",
+            schedule: [
+                { time: "Morning", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take first dose of herbal antimicrobials with low-FODMAP breakfast." },
+                { time: "Afternoon", action: "Low-FODMAP lunch. Ensure 4-5 hours of spacing between meals to promote MMC." },
+                { time: "Evening", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take second dose of herbals with low-FODMAP dinner." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., MotilPro) at least 2 hours after dinner." }
+            ]
         },
         protocol: [
             {
@@ -140,6 +203,15 @@ const siboMethodsData = [
             text: "This protocol is based on the well-established concept of the Migrating Motor Complex (MMC). While the components (like ginger & artichoke prokinetics) have some studies, this specific comprehensive protocol is anecdotal.",
             url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3290399/"
         },
+        sampleDay: {
+            title: "A Sample Day for Improving Motility",
+            schedule: [
+                { time: "Waking Up", action: "Drink a large glass of warm water. Practice deep breathing or vagus nerve stimulation exercises." },
+                { time: "Breakfast", action: "Take Betaine HCL with a protein-rich, low-FODMAP breakfast. Chew every bite thoroughly." },
+                { time: "Between Meals", action: "No snacking. Drink plenty of water. Go for a short walk after meals." },
+                { time: "Bedtime", action: "Take prokinetic (Ginger & Artichoke) on an empty stomach, at least 2-3 hours after your last meal." }
+            ]
+        },
         protocol: [
             {
                 phase: "Phase 1: Assessment and Monitoring",
@@ -172,6 +244,14 @@ const siboMethodsData = [
         citation: {
             text: "There is no peer-reviewed evidence to support colon hydrotherapy as a treatment for SIBO. Major medical institutions like the Mayo Clinic advise that it is unnecessary and carries potential risks.",
             url: "https://www.mayoclinic.org/healthy-lifestyle/consumer-health/expert-answers/colon-cleansing/faq-20058435"
+        },
+        sampleDay: {
+            title: "A Sample Day for Digestive Reset",
+            schedule: [
+                { time: "Morning", action: "Start the day with 2-3 large glasses of filtered water. Take Betaine HCL with a well-chewed, simple breakfast." },
+                { time: "Throughout Day", action: "Focus on hydration, aiming for 2-3 liters of water. Avoid snacking. Eat slowly and mindfully." },
+                { time: "Evening", action: "Take TUDCA or Ox Bile with dinner if fats are difficult to digest. Practice relaxation techniques before bed." }
+            ]
         },
         protocol: [
             {
@@ -358,6 +438,21 @@ const MethodDetailPage = ({ method, onBack }) => {
                     </a>
                 )}
             </div>
+
+            {/* --- New Sample Day Section --- */}
+            {method.sampleDay && (
+                 <div className="bg-gray-100 p-6 rounded-lg mb-8">
+                    <h3 className="font-bold text-lg mb-4 text-gray-800">{method.sampleDay.title}</h3>
+                    <dl className="space-y-4">
+                        {method.sampleDay.schedule.map((item, index) => (
+                            <div key={index} className="flex">
+                                <dt className="w-1/3 font-semibold text-gray-700">{item.time}:</dt>
+                                <dd className="w-2/3 text-gray-600">{item.action}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            )}
 
             <p className="text-lg text-gray-600 mb-8">{method.summary}</p>
 
