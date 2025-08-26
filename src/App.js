@@ -1,4 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+// --- Import the functions you need from the Firebase SDKs ---
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
+
+// --- Firebase Configuration ---
+// TODO: Add your own Firebase configuration from your Firebase project settings
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// Get a reference to the Firestore database
+const db = getFirestore(app);
+
 
 // --- Data for SIBO Methods with Evidence Tiers & Citations ---
 const siboMethodsData = [
@@ -485,12 +505,30 @@ const MethodDetailPage = ({ method, onBack }) => {
 export default function App() {
     const [currentPage, setCurrentPage] = useState('list');
     const [selectedMethodId, setSelectedMethodId] = useState(null);
-    const [votes, setVotes] = useState(() => {
-        const initialVotes = {};
-        siboMethodsData.forEach(method => { initialVotes[method.id] = { likes: 0, dislikes: 0 }; });
-        return initialVotes;
-    });
+    
+    // This state now holds the vote counts fetched from Firebase
+    const [votes, setVotes] = useState({});
+    
+    // This state still tracks the local user's vote to update the UI instantly
     const [userVotes, setUserVotes] = useState({});
+
+    // --- useEffect to fetch and listen for votes from Firebase ---
+    useEffect(() => {
+        const votesCollection = collection(db, 'votes');
+        
+        // Set up the real-time listener
+        const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
+            const votesData = {};
+            snapshot.forEach(doc => {
+                votesData[doc.id] = doc.data();
+            });
+            setVotes(votesData);
+        });
+
+        // Cleanup the listener when the component unmounts
+        return () => unsubscribe();
+    }, []);
+
 
     const handleSelectMethod = (id) => {
         setSelectedMethodId(id);
@@ -502,20 +540,27 @@ export default function App() {
         setCurrentPage('list');
     };
 
-    const handleVote = (id, voteType) => {
+    // --- Updated handleVote function to use Firebase ---
+    const handleVote = async (id, voteType) => {
         const existingVote = userVotes[id];
-        setVotes(prevVotes => {
-            const newVotes = JSON.parse(JSON.stringify(prevVotes));
-            if (existingVote) {
-                if (existingVote === 'like') newVotes[id].likes--;
-                if (existingVote === 'dislike') newVotes[id].dislikes--;
-            }
-            if (existingVote !== voteType) {
-                if (voteType === 'like') newVotes[id].likes++;
-                if (voteType === 'dislike') newVotes[id].dislikes++;
-            }
-            return newVotes;
-        });
+        const methodId = String(id); // Ensure the ID is a string for Firestore
+        const voteDocRef = doc(db, 'votes', methodId);
+
+        // Update the local UI immediately for a responsive feel
+        const tempVotes = JSON.parse(JSON.stringify(votes));
+        if (!tempVotes[methodId]) {
+            tempVotes[methodId] = { likes: 0, dislikes: 0 };
+        }
+        if (existingVote) {
+            if (existingVote === 'like') tempVotes[methodId].likes--;
+            if (existingVote === 'dislike') tempVotes[methodId].dislikes--;
+        }
+        if (existingVote !== voteType) {
+            if (voteType === 'like') tempVotes[methodId].likes++;
+            if (voteType === 'dislike') tempVotes[methodId].dislikes++;
+        }
+        setVotes(tempVotes);
+
         setUserVotes(prevUserVotes => {
             const newUserVotes = { ...prevUserVotes };
             if (existingVote === voteType) {
@@ -525,6 +570,39 @@ export default function App() {
             }
             return newUserVotes;
         });
+
+        // Perform the database update using a transaction
+        try {
+            await runTransaction(db, async (transaction) => {
+                const voteDoc = await transaction.get(voteDocRef);
+                
+                let newLikes = 0;
+                let newDislikes = 0;
+
+                if (voteDoc.exists()) {
+                    newLikes = voteDoc.data().likes || 0;
+                    newDislikes = voteDoc.data().dislikes || 0;
+                }
+
+                // Reverse the old vote if it exists
+                if (existingVote === 'like') newLikes--;
+                if (existingVote === 'dislike') newDislikes--;
+                
+                // Add the new vote, unless the user is un-voting
+                if (existingVote !== voteType) {
+                    if (voteType === 'like') newLikes++;
+                    if (voteType === 'dislike') newDislikes++;
+                }
+
+                transaction.set(voteDocRef, { 
+                    likes: Math.max(0, newLikes), 
+                    dislikes: Math.max(0, newDislikes) 
+                }, { merge: true });
+            });
+        } catch (e) {
+            console.error("Transaction failed: ", e);
+            // If the transaction fails, you might want to revert the local state changes
+        }
     };
 
     const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
