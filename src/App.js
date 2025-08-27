@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
@@ -428,11 +428,11 @@ const AiPatternAnalysis = () => {
 // --- New Header Component for Login/Logout ---
 const Header = ({ user }) => {
     const handleLogin = () => {
-        netlifyIdentity.open('login');
+        window.netlifyIdentity.open('login');
     };
 
     const handleLogout = () => {
-        netlifyIdentity.logout();
+        window.netlifyIdentity.logout();
     };
 
     return (
@@ -644,7 +644,7 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
                     </div>
                 )}
                 <div className="space-y-6">
@@ -677,26 +677,28 @@ export default function App() {
 
     // --- useEffect for Authentication ---
     useEffect(() => {
-        netlifyIdentity.init();
-        const currentUser = netlifyIdentity.currentUser();
-        if (currentUser) {
-            setUser(currentUser);
+        if (window.netlifyIdentity) {
+            window.netlifyIdentity.init();
+            const currentUser = window.netlifyIdentity.currentUser();
+            if (currentUser) {
+                setUser(currentUser);
+            }
+
+            window.netlifyIdentity.on('login', (user) => {
+                setUser(user);
+                window.netlifyIdentity.close();
+            });
+
+            window.netlifyIdentity.on('logout', () => {
+                setUser(null);
+                setUserVotes({}); // Clear local votes on logout
+            });
+
+             return () => {
+                window.netlifyIdentity.off('login');
+                window.netlifyIdentity.off('logout');
+            };
         }
-
-        netlifyIdentity.on('login', (user) => {
-            setUser(user);
-            netlifyIdentity.close();
-        });
-
-        netlifyIdentity.on('logout', () => {
-            setUser(null);
-            setUserVotes({}); // Clear local votes on logout
-        });
-
-        return () => {
-            netlifyIdentity.off('login');
-            netlifyIdentity.off('logout');
-        };
     }, []);
 
     // --- useEffect to fetch votes from Firebase ---
@@ -744,7 +746,7 @@ export default function App() {
     // --- Updated handleVote function to require login ---
     const handleVote = async (id, voteType) => {
         if (!user) {
-            netlifyIdentity.open('login');
+            window.netlifyIdentity.open('login');
             return;
         }
 
