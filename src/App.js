@@ -427,11 +427,11 @@ const AiPatternAnalysis = () => {
 // --- New Header Component for Login/Logout ---
 const Header = ({ user, onGoHome, onSubmitMethod }) => {
     const handleLogin = () => {
-        netlifyIdentity.open('login');
+        window.netlifyIdentity.open('login');
     };
 
     const handleLogout = () => {
-        netlifyIdentity.logout();
+        window.netlifyIdentity.logout();
     };
 
     return (
@@ -646,7 +646,7 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
                     </div>
                 )}
                 <div className="space-y-6">
@@ -697,7 +697,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
