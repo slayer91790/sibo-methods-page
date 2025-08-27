@@ -426,19 +426,22 @@ const AiPatternAnalysis = () => {
 };
 
 // --- New Header Component for Login/Logout ---
-const Header = ({ user }) => {
+const Header = ({ user, onGoHome, onSubmitMethod }) => {
     const handleLogin = () => {
-        window.netlifyIdentity.open('login');
+        netlifyIdentity.open('login');
     };
 
     const handleLogout = () => {
-        window.netlifyIdentity.logout();
+        netlifyIdentity.logout();
     };
 
     return (
         <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-            <h1 className="text-xl font-bold text-gray-800">SIBO Recovery Hub</h1>
-            <div>
+            <button onClick={onGoHome} className="text-xl font-bold text-gray-800">SIBO Recovery Hub</button>
+            <div className="flex items-center space-x-4">
+                 <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
+                    Submit a Method
+                </button>
                 {user ? (
                     <div className="flex items-center space-x-4">
                         <span className="text-gray-600">Welcome, {user.user_metadata.full_name || user.email}</span>
@@ -644,7 +647,7 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
                     </div>
                 )}
                 <div className="space-y-6">
@@ -663,6 +666,83 @@ const CommentsSection = ({ methodId, user }) => {
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
+
+// --- New Submit Method Page Component ---
+const SubmitMethodPage = ({ onBack, user }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        summary: '',
+        sourceLink: '',
+        symptoms: '',
+        protocol: '',
+        sampleDay: ''
+    });
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        // In a real application, you would save this data to a "pending" collection in Firestore
+        // For now, it just shows an alert.
+        alert("Thank you for your submission! It will be reviewed shortly.");
+        onBack();
+    };
+
+    if (!user) {
+        return (
+            <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
+                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
+             <button onClick={onBack} className="mb-8 flex items-center text-blue-600 hover:text-blue-800 font-semibold">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back to All Methods
+            </button>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6">Submit a New Recovery Method</h1>
+            <p className="text-gray-600 mb-8">Thank you for contributing to the community! Please provide as much detail as possible. Your submission will be reviewed before being published.</p>
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md border border-gray-200">
+                <div>
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700">Method Title</label>
+                    <input type="text" name="title" id="title" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Low-Dose Naltrexone (LDN) Protocol" value={formData.title} onChange={handleChange} />
+                </div>
+                 <div>
+                    <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Short Summary</label>
+                    <textarea name="summary" id="summary" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Briefly describe the method and its main principle." value={formData.summary} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="sourceLink" className="block text-sm font-medium text-gray-700">Link to Source (Optional)</label>
+                    <input type="url" name="sourceLink" id="sourceLink" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Reddit post, blog, or article URL" value={formData.sourceLink} onChange={handleChange} />
+                </div>
+                <div>
+                    <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700">What symptoms is this method best for?</label>
+                    <textarea name="symptoms" id="symptoms" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Methane-dominant SIBO, Chronic Constipation, Brain Fog" value={formData.symptoms} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="protocol" className="block text-sm font-medium text-gray-700">Full Protocol Details</label>
+                    <textarea name="protocol" id="protocol" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe the phases and steps in detail. Include dosages, timing, and duration." value={formData.protocol} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="sampleDay" className="block text-sm font-medium text-gray-700">A Sample Day</label>
+                    <textarea name="sampleDay" id="sampleDay" rows="5" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe a typical day following this protocol from morning to night." value={formData.sampleDay} onChange={handleChange}></textarea>
+                </div>
+                <div>
+                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        Submit for Review
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };
@@ -742,6 +822,16 @@ export default function App() {
         setSelectedMethodId(null);
         setCurrentPage('list');
     };
+    
+    const handleGoHome = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('list');
+    };
+
+    const handleSubmitMethod = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('submit');
+    };
 
     // --- Updated handleVote function to require login ---
     const handleVote = async (id, voteType) => {
@@ -805,25 +895,28 @@ export default function App() {
 
     const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
 
-    return (
-        <main className="bg-gray-50 min-h-screen font-sans">
-            <Header user={user} />
-            {currentPage === 'list' && (
-                <MethodListPage 
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'detail':
+                return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
+            case 'submit':
+                return <SubmitMethodPage onBack={handleBack} user={user} />;
+            case 'list':
+            default:
+                return <MethodListPage 
                     methods={siboMethodsData} 
                     onSelectMethod={handleSelectMethod}
                     onVote={handleVote}
                     votes={votes}
                     userVotes={userVotes}
-                />
-            )}
-            {currentPage === 'detail' && selectedMethod && (
-                <MethodDetailPage 
-                    method={selectedMethod} 
-                    onBack={handleBack} 
-                    user={user}
-                />
-            )}
+                />;
+        }
+    };
+
+    return (
+        <main className="bg-gray-50 min-h-screen font-sans">
+            <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} />
+            {renderPage()}
         </main>
     );
 }
