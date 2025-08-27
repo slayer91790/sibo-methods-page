@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, 'useState', useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
+// --- Import Netlify Identity for Authentication ---
+import netlifyIdentity from 'netlify-identity-widget';
 
 // --- Firebase Configuration ---
 // Your web app's Firebase configuration
@@ -377,6 +379,37 @@ const AiPatternAnalysis = () => {
     );
 };
 
+// --- New Header Component for Login/Logout ---
+const Header = ({ user }) => {
+    const handleLogin = () => {
+        netlifyIdentity.open('login');
+    };
+
+    const handleLogout = () => {
+        netlifyIdentity.logout();
+    };
+
+    return (
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h1 className="text-xl font-bold text-gray-800">SIBO Recovery Hub</h1>
+            <div>
+                {user ? (
+                    <div className="flex items-center space-x-4">
+                        <span className="text-gray-600">Welcome, {user.user_metadata.full_name || user.email}</span>
+                        <button onClick={handleLogout} className="font-semibold text-red-600 hover:text-red-800">
+                            Log Out
+                        </button>
+                    </div>
+                ) : (
+                    <button onClick={handleLogin} className="font-semibold text-blue-600 hover:text-blue-800">
+                        Log In / Sign Up
+                    </button>
+                )}
+            </div>
+        </header>
+    );
+};
+
 
 // --- Main Application Components ---
 
@@ -461,7 +494,6 @@ const MethodDetailPage = ({ method, onBack }) => {
                 )}
             </div>
 
-            {/* --- New Sample Day Section --- */}
             {method.sampleDay && (
                  <div className="bg-gray-100 p-6 rounded-lg mb-8">
                     <h3 className="font-bold text-lg mb-4 text-gray-800">{method.sampleDay.title}</h3>
@@ -507,29 +539,64 @@ const MethodDetailPage = ({ method, onBack }) => {
 export default function App() {
     const [currentPage, setCurrentPage] = useState('list');
     const [selectedMethodId, setSelectedMethodId] = useState(null);
-    
-    // This state now holds the vote counts fetched from Firebase
     const [votes, setVotes] = useState({});
-    
-    // This state still tracks the local user's vote to update the UI instantly
     const [userVotes, setUserVotes] = useState({});
+    const [user, setUser] = useState(null); // State to hold the current user
 
-    // --- useEffect to fetch and listen for votes from Firebase ---
+    // --- useEffect for Authentication ---
+    useEffect(() => {
+        netlifyIdentity.init();
+        const currentUser = netlifyIdentity.currentUser();
+        if (currentUser) {
+            setUser(currentUser);
+        }
+
+        netlifyIdentity.on('login', (user) => {
+            setUser(user);
+            netlifyIdentity.close();
+        });
+
+        netlifyIdentity.on('logout', () => {
+            setUser(null);
+            setUserVotes({}); // Clear local votes on logout
+        });
+
+        return () => {
+            netlifyIdentity.off('login');
+            netlifyIdentity.off('logout');
+        };
+    }, []);
+
+    // --- useEffect to fetch votes from Firebase ---
     useEffect(() => {
         const votesCollection = collection(db, 'votes');
-        
-        // Set up the real-time listener
         const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
             const votesData = {};
             snapshot.forEach(doc => {
-                votesData[doc.id] = doc.data();
+                votesData[doc.id] = {
+                    likes: doc.data().likes || 0,
+                    dislikes: doc.data().dislikes || 0,
+                };
             });
             setVotes(votesData);
         });
-
-        // Cleanup the listener when the component unmounts
         return () => unsubscribe();
     }, []);
+
+    // --- useEffect to fetch the logged-in user's specific votes ---
+    useEffect(() => {
+        if (user) {
+            const userVotesCollection = collection(db, `users/${user.id}/userVotes`);
+            const unsubscribe = onSnapshot(userVotesCollection, (snapshot) => {
+                const userVotesData = {};
+                snapshot.forEach(doc => {
+                    userVotesData[doc.id] = doc.data().vote;
+                });
+                setUserVotes(userVotesData);
+            });
+            return () => unsubscribe();
+        }
+    }, [user]);
 
 
     const handleSelectMethod = (id) => {
@@ -542,38 +609,18 @@ export default function App() {
         setCurrentPage('list');
     };
 
-    // --- Updated handleVote function to use Firebase ---
+    // --- Updated handleVote function to require login ---
     const handleVote = async (id, voteType) => {
+        if (!user) {
+            netlifyIdentity.open('login');
+            return;
+        }
+
         const existingVote = userVotes[id];
-        const methodId = String(id); // Ensure the ID is a string for Firestore
+        const methodId = String(id);
         const voteDocRef = doc(db, 'votes', methodId);
+        const userVoteDocRef = doc(db, `users/${user.id}/userVotes`, methodId);
 
-        // Update the local UI immediately for a responsive feel
-        const tempVotes = JSON.parse(JSON.stringify(votes));
-        if (!tempVotes[methodId]) {
-            tempVotes[methodId] = { likes: 0, dislikes: 0 };
-        }
-        if (existingVote) {
-            if (existingVote === 'like') tempVotes[methodId].likes--;
-            if (existingVote === 'dislike') tempVotes[methodId].dislikes--;
-        }
-        if (existingVote !== voteType) {
-            if (voteType === 'like') tempVotes[methodId].likes++;
-            if (voteType === 'dislike') tempVotes[methodId].dislikes++;
-        }
-        setVotes(tempVotes);
-
-        setUserVotes(prevUserVotes => {
-            const newUserVotes = { ...prevUserVotes };
-            if (existingVote === voteType) {
-                delete newUserVotes[id];
-            } else {
-                newUserVotes[id] = voteType;
-            }
-            return newUserVotes;
-        });
-
-        // Perform the database update using a transaction
         try {
             await runTransaction(db, async (transaction) => {
                 const voteDoc = await transaction.get(voteDocRef);
@@ -586,11 +633,9 @@ export default function App() {
                     newDislikes = voteDoc.data().dislikes || 0;
                 }
 
-                // Reverse the old vote if it exists
                 if (existingVote === 'like') newLikes--;
                 if (existingVote === 'dislike') newDislikes--;
                 
-                // Add the new vote, unless the user is un-voting
                 if (existingVote !== voteType) {
                     if (voteType === 'like') newLikes++;
                     if (voteType === 'dislike') newDislikes++;
@@ -600,10 +645,27 @@ export default function App() {
                     likes: Math.max(0, newLikes), 
                     dislikes: Math.max(0, newDislikes) 
                 }, { merge: true });
+
+                if (existingVote === voteType) {
+                    transaction.delete(userVoteDocRef);
+                } else {
+                    transaction.set(userVoteDocRef, { vote: voteType });
+                }
             });
+
+             // Update local state after successful transaction
+            setUserVotes(prevUserVotes => {
+                const newUserVotes = { ...prevUserVotes };
+                if (existingVote === voteType) {
+                    delete newUserVotes[id];
+                } else {
+                    newUserVotes[id] = voteType;
+                }
+                return newUserVotes;
+            });
+
         } catch (e) {
             console.error("Transaction failed: ", e);
-            // If the transaction fails, you might want to revert the local state changes
         }
     };
 
@@ -611,6 +673,7 @@ export default function App() {
 
     return (
         <main className="bg-gray-50 min-h-screen font-sans">
+            <Header user={user} />
             {currentPage === 'list' && (
                 <MethodListPage 
                     methods={siboMethodsData} 
