@@ -31,6 +31,7 @@ const siboMethodsData = [
         title: "Rifaximin (Pharmaceutical) Protocol",
         summary: "Utilizes the prescription antibiotic Rifaximin, often in combination with another antibiotic for methane-dominant SIBO, as the primary means of eradicating the bacterial overgrowth.",
         evidenceTier: 1,
+        commonSymptoms: ["Hydrogen-dominant SIBO", "Diarrhea", "Bloating", "Methane SIBO (with Neomycin)"],
         citation: {
             text: "A landmark 2010 double-blind, placebo-controlled trial demonstrating the efficacy of Rifaximin for non-constipation IBS, which has significant overlap with SIBO.",
             url: "https://pubmed.ncbi.nlm.nih.gov/21182358/"
@@ -69,6 +70,7 @@ const siboMethodsData = [
         title: "Herbal Antimicrobial Protocol",
         summary: "Focuses on using natural compounds with antimicrobial properties to reduce bacterial overgrowth in the small intestine. Often favored by those seeking a less aggressive alternative to prescription antibiotics.",
         evidenceTier: 2,
+        commonSymptoms: ["Mixed SIBO (Hydrogen & Methane)", "Bloating", "General Dysbiosis", "Candida Overgrowth"],
         citation: {
             text: "A 2014 study showing herbal therapy (Candibactin-AR and Candibactin-BR) is as effective as Rifaximin for SIBO resolution in a non-controlled trial.",
             url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4030608/"
@@ -111,6 +113,7 @@ const siboMethodsData = [
         title: "The Elemental Diet",
         summary: "A more intensive, short-term approach that involves consuming a liquid-only diet of pre-digested nutrients to starve bacteria while nourishing the individual.",
         evidenceTier: 2,
+        commonSymptoms: ["Severe/Stubborn Cases", "High Gas Levels", "Multiple Food Intolerances", "Need for a Gut Reset"],
         citation: {
             text: "A pilot study from 2004 showing an 80% success rate in normalizing SIBO breath tests after a 14-day elemental diet.",
             url: "https://pubmed.ncbi.nlm.nih.gov/14992438/"
@@ -147,10 +150,51 @@ const siboMethodsData = [
         ]
     },
     {
+        id: 8,
+        title: "Atrantil & Berberine Complex Protocol",
+        summary: "A user-reported protocol for high methane SIBO (IMO) using a slow titration of Atrantil and a specific Berberine Complex, combined with motility support.",
+        evidenceTier: 3,
+        commonSymptoms: ["High Methane SIBO (IMO)", "Chronic Constipation", "Bloating", "Candida Overgrowth"],
+        citation: {
+            text: "This is a detailed success story shared by a user on Reddit. The specific combination and titration schedule are anecdotal.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day on the Atrantil & Berberine Protocol",
+            schedule: [
+                { time: "Morning", action: "Take current dose of Atrantil and Berberine Complex with a low-FODMAP/Candida diet breakfast. (e.g., start with 1 pill of each)." },
+                { time: "During Day", action: "Take motility medications as prescribed (e.g., Motegrity, Amitiza). Continue Candida/Low-FODMAP diet." },
+                { time: "Evening", action: "Take final dose of Atrantil and Berberine Complex with dinner." },
+                { time: "Bedtime", action: "Take nightly motility medication on an empty stomach." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Eradication (Slow Titration)",
+                steps: [
+                    { title: "Start Slow", description: "Begin with 1 pill of Atrantil and 1 pill of Integrative Therapeutics Berberine Complex daily." },
+                    { title: "Increase Dosage", description: "Increase dosage slowly every 5-7 days (e.g., to 2 pills of each, then 3, etc.) until reaching the full dosage of 6 pills of each per day." },
+                    { title: "Maintain Full Dosage", description: "Stay at the full dosage for approximately 2.5 months or until bloating resolves." },
+                    { title: "Support Motility", description: "Concurrently manage constipation with motility aids (prescription or OTC like MagO7) as this is a key factor." },
+                    { title: "Diet", description: "Follow a combined Candida Diet and Low FODMAP Diet during treatment." }
+                ]
+            },
+            {
+                phase: "Phase 2: Relapse Prevention (Maintenance)",
+                steps: [
+                    { title: "Taper Down", description: "After symptoms resolve, begin to taper down the dosage. This user took 1 pill of each daily for one year." },
+                    { title: "Further Reduction", description: "Reduce to 1 pill of each every other day for another 8 months before stopping." },
+                    { title: "Long-Term Motility", description: "Continue long-term prescription motility support (e.g., Motegrity, Amitiza) as needed for underlying slow transit." }
+                ]
+            }
+        ]
+    },
+    {
         id: 4,
         title: "Probiotic and Prokinetic Protocol",
         summary: "Emphasizes the combination of a specific probiotic with a prokinetic to manage symptoms and restore gut function, particularly in cases linked to post-infectious IBS.",
         evidenceTier: 3,
+        commonSymptoms: ["Post-Infectious IBS", "Motility Issues", "Relapse Prevention"],
         citation: {
             text: "This protocol is based on a user's experience. While specific probiotics and prokinetics have been studied individually, this particular combination is anecdotal.",
             url: null
@@ -180,6 +224,7 @@ const siboMethodsData = [
         title: "Aggressive Multi-Phase Protocol",
         summary: "An aggressive protocol for stubborn SIBO. It operates on a multi-pronged, rotational attack using the elemental diet, pharmaceuticals, and herbals to prevent microbial resistance.",
         evidenceTier: 3,
+        commonSymptoms: ["Stubborn/Recurrent SIBO", "High Methane/Hydrogen Levels", "Biofilm-Related Issues"],
         citation: {
             text: "This is a community-derived protocol based on anecdotal reports. It combines several methods (Elemental, Pharmaceutical, Herbal) which have individual scientific backing (see other methods). The combined protocol itself has not been studied.",
             url: null
@@ -223,6 +268,7 @@ const siboMethodsData = [
         title: "Intestinal Transit & Motility Protocol",
         summary: "Centers on the core belief that SIBO is fundamentally a problem of slow intestinal transit. The primary goal is to speed up digestion and motility.",
         evidenceTier: 3,
+        commonSymptoms: ["Chronic Constipation", "Slow Transit Time", "Bloating After Meals"],
         citation: {
             text: "This protocol is based on the well-established concept of the Migrating Motor Complex (MMC). While the components (like ginger & artichoke prokinetics) have some studies, this specific comprehensive protocol is anecdotal.",
             url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3290399/"
@@ -265,6 +311,7 @@ const siboMethodsData = [
         title: "Colon Hydrotherapy & Digestive Reset",
         summary: "Posits that the root cause can be old fecal deposits. The core of the treatment is to physically clean the colon while rebuilding healthy digestive habits.",
         evidenceTier: 0, // Special tier for "No Evidence / Caution"
+        commonSymptoms: ["Severe Constipation", "Feeling of 'Fullness' or Blockage", "Systemic Issues"],
         citation: {
             text: "There is no peer-reviewed evidence to support colon hydrotherapy as a treatment for SIBO. Major medical institutions like the Mayo Clinic advise that it is unnecessary and carries potential risks.",
             url: "https://www.mayoclinic.org/healthy-lifestyle/consumer-health/expert-answers/colon-cleansing/faq-20058435"
@@ -493,6 +540,18 @@ const MethodDetailPage = ({ method, onBack, user }) => {
                     </a>
                 )}
             </div>
+
+            {/* --- New Symptoms Section --- */}
+            {method.commonSymptoms && (
+                 <div className="mb-8">
+                    <h3 className="font-bold text-lg mb-2 text-gray-800">Best For These Symptoms:</h3>
+                    <div className="flex flex-wrap gap-2">
+                        {method.commonSymptoms.map((symptom, index) => (
+                            <span key={index} className="bg-gray-200 text-gray-700 text-sm font-medium px-3 py-1 rounded-full">{symptom}</span>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {method.sampleDay && (
                  <div className="bg-gray-100 p-6 rounded-lg mb-8">
