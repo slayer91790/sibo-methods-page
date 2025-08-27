@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 // --- Import Netlify Identity for Authentication ---
 import netlifyIdentity from 'netlify-identity-widget';
 
@@ -473,7 +473,7 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes }) =
     );
 };
 
-const MethodDetailPage = ({ method, onBack }) => {
+const MethodDetailPage = ({ method, onBack, user }) => {
     return (
         <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
             <button onClick={onBack} className="mb-8 flex items-center text-blue-600 hover:text-blue-800 font-semibold">
@@ -532,9 +532,83 @@ const MethodDetailPage = ({ method, onBack }) => {
                     </div>
                 ))}
             </div>
+            <CommentsSection methodId={method.id} user={user} />
         </div>
     );
 };
+
+// --- New Comments Section Component ---
+const CommentsSection = ({ methodId, user }) => {
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState("");
+
+    useEffect(() => {
+        const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
+        const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
+            const fetchedComments = [];
+            snapshot.forEach(doc => {
+                fetchedComments.push({ id: doc.id, ...doc.data() });
+            });
+            setComments(fetchedComments);
+        });
+        return () => unsubscribe();
+    }, [methodId]);
+
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim() || !user) return;
+
+        await addDoc(collection(db, `methods/${methodId}/comments`), {
+            text: newComment,
+            userName: user.user_metadata.full_name || user.email,
+            userId: user.id,
+            timestamp: serverTimestamp()
+        });
+        setNewComment("");
+    };
+
+    return (
+        <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Community Discussion</h2>
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                {user ? (
+                    <form onSubmit={handleCommentSubmit} className="mb-6">
+                        <textarea
+                            className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            rows="4"
+                            placeholder="Share your experience with this method..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                        ></textarea>
+                        <button type="submit" className="mt-3 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400" disabled={!newComment.trim()}>
+                            Post Comment
+                        </button>
+                    </form>
+                ) : (
+                    <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                    </div>
+                )}
+                <div className="space-y-6">
+                    {comments.length > 0 ? (
+                        comments.map(comment => (
+                            <div key={comment.id} className="border-b border-gray-200 pb-4">
+                                <p className="font-semibold text-gray-800">{comment.userName}</p>
+                                <p className="text-xs text-gray-500 mb-2">
+                                    {comment.timestamp ? new Date(comment.timestamp.toDate()).toLocaleString() : 'Just now'}
+                                </p>
+                                <p className="text-gray-700">{comment.text}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-gray-500">No comments yet. Be the first to share your experience!</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 export default function App() {
     const [currentPage, setCurrentPage] = useState('list');
@@ -687,6 +761,7 @@ export default function App() {
                 <MethodDetailPage 
                     method={selectedMethod} 
                     onBack={handleBack} 
+                    user={user}
                 />
             )}
         </main>
