@@ -4,15 +4,17 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
 
 // --- Firebase Configuration ---
-// TODO: Add your own Firebase configuration from your Firebase project settings
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDh0lTXhQvS_TeR5GqAC2v31qrK0oZIIJM",
+  authDomain: "sibo-recovery-app.firebaseapp.com",
+  projectId: "sibo-recovery-app",
+  storageBucket: "sibo-recovery-app.appspot.com",
+  messagingSenderId: "1000892499513",
+  appId: "1:1000892499513:web:e97b14d06004f52be9afe8",
+  measurementId: "G-50MYVFXV5H"
 };
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
