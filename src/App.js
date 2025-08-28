@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+// --- Import Netlify Identity for Authentication ---
+import netlifyIdentity from 'netlify-identity-widget';
 
 // --- Firebase Configuration ---
 // Your web app's Firebase configuration
@@ -425,13 +427,13 @@ const AiPatternAnalysis = () => {
 };
 
 // --- New Header Component for Login/Logout ---
-const Header = ({ user, onGoHome, onSubmitMethod }) => {
+const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
-        window.netlifyIdentity.open('login');
+        netlifyIdentity.open('login');
     };
 
     const handleLogout = () => {
-        window.netlifyIdentity.logout();
+        netlifyIdentity.logout();
     };
 
     return (
@@ -440,6 +442,9 @@ const Header = ({ user, onGoHome, onSubmitMethod }) => {
             <div className="flex items-center space-x-4">
                  <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
                     Submit a Method
+                </button>
+                 <button onClick={onFeedback} className="font-semibold text-purple-600 hover:text-purple-800">
+                    Feedback
                 </button>
                 {user ? (
                     <div className="flex items-center space-x-4">
@@ -491,17 +496,23 @@ const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => {
     );
 };
 
-const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes }) => {
-    const sortedMethods = [...methods].sort((a, b) => a.evidenceTier > b.evidenceTier ? -1 : 1);
-    
+const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange }) => {
     return (
         <div className="p-4 sm:p-6 md:p-8">
             <header className="text-center mb-10">
                 <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">Community-Sourced SIBO Protocols</h1>
                 <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">Explore recovery methods backed by community experience and scientific evidence. Vote on what you've tried and see what has worked for others.</p>
             </header>
+            
+            <div className="flex justify-end mb-6">
+                <select onChange={(e) => onSortChange(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <option value="evidence">Sort by Evidence Tier</option>
+                    <option value="likes">Sort by Most Likes</option>
+                </select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {sortedMethods.map(method => (
+                {methods.map(method => (
                     <MethodCard 
                         key={method.id} 
                         method={method} 
@@ -646,7 +657,7 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
                     </div>
                 )}
                 <div className="space-y-6">
@@ -679,25 +690,39 @@ const SubmitMethodPage = ({ onBack, user }) => {
         protocol: '',
         sampleDay: ''
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // In a real application, you would save this data to a "pending" collection in Firestore
-        // For now, it just shows an alert.
-        alert("Thank you for your submission! It will be reviewed shortly.");
-        onBack();
+        if (!user) return;
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, 'submissions'), {
+                ...formData,
+                submittedBy: user.email,
+                userId: user.id,
+                submittedAt: serverTimestamp()
+            });
+            alert("Thank you for your submission! It will be reviewed shortly.");
+            onBack();
+        } catch (error) {
+            console.error("Error submitting form: ", error);
+            alert("Sorry, there was an error submitting your form. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!user) {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
@@ -737,8 +762,67 @@ const SubmitMethodPage = ({ onBack, user }) => {
                     <textarea name="sampleDay" id="sampleDay" rows="5" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe a typical day following this protocol from morning to night." value={formData.sampleDay} onChange={handleChange}></textarea>
                 </div>
                 <div>
-                    <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                        Submit for Review
+                    <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400">
+                        {isSubmitting ? 'Submitting...' : 'Submit for Review'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+// --- New Feedback Page Component ---
+const FeedbackPage = ({ onBack, user }) => {
+    const [feedback, setFeedback] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!feedback.trim() || !user) return;
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, 'feedback'), {
+                feedbackText: feedback,
+                submittedBy: user.email,
+                userId: user.id,
+                submittedAt: serverTimestamp()
+            });
+            alert("Thank you for your feedback!");
+            onBack();
+        } catch (error) {
+            console.error("Error submitting feedback: ", error);
+            alert("Sorry, there was an error submitting your feedback. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+     if (!user) {
+        return (
+            <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
+                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit Feedback</h1>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit feedback.</p>
+                 <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
+            <button onClick={onBack} className="mb-8 flex items-center text-blue-600 hover:text-blue-800 font-semibold">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back to All Methods
+            </button>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6">Share Your Feedback</h1>
+            <p className="text-gray-600 mb-8">Have an idea to improve the site? Found a bug? Let us know! Your feedback is invaluable in making this a better resource for the community.</p>
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md border border-gray-200">
+                <div>
+                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700">Your Feedback</label>
+                    <textarea name="feedback" id="feedback" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Tell us what you think..." value={feedback} onChange={(e) => setFeedback(e.target.value)}></textarea>
+                </div>
+                <div>
+                    <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400">
+                        {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                     </button>
                 </div>
             </form>
@@ -753,6 +837,7 @@ export default function App() {
     const [votes, setVotes] = useState({});
     const [userVotes, setUserVotes] = useState({});
     const [user, setUser] = useState(null); // State to hold the current user
+    const [sortOrder, setSortOrder] = useState('evidence'); // 'evidence' or 'likes'
 
     // --- useEffect for Authentication ---
     useEffect(() => {
@@ -785,11 +870,11 @@ export default function App() {
         const votesCollection = collection(db, 'votes');
         const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
             const votesData = {};
+            siboMethodsData.forEach(method => {
+                votesData[String(method.id)] = { likes: 0, dislikes: 0 };
+            });
             snapshot.forEach(doc => {
-                votesData[doc.id] = {
-                    likes: doc.data().likes || 0,
-                    dislikes: doc.data().dislikes || 0,
-                };
+                votesData[doc.id] = doc.data();
             });
             setVotes(votesData);
         });
@@ -830,6 +915,11 @@ export default function App() {
     const handleSubmitMethod = () => {
         setSelectedMethodId(null);
         setCurrentPage('submit');
+    };
+    
+    const handleFeedback = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('feedback');
     };
 
     // --- Updated handleVote function to require login ---
@@ -892,6 +982,16 @@ export default function App() {
         }
     };
 
+    const sortedMethods = [...siboMethodsData].sort((a, b) => {
+        if (sortOrder === 'likes') {
+            const likesA = votes[a.id]?.likes || 0;
+            const likesB = votes[b.id]?.likes || 0;
+            return likesB - likesA;
+        }
+        // Default to evidence tier sort
+        return b.evidenceTier - a.evidenceTier;
+    });
+
     const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
 
     const renderPage = () => {
@@ -900,21 +1000,24 @@ export default function App() {
                 return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
             case 'submit':
                 return <SubmitMethodPage onBack={handleBack} user={user} />;
+            case 'feedback':
+                return <FeedbackPage onBack={handleBack} user={user} />;
             case 'list':
             default:
                 return <MethodListPage 
-                    methods={siboMethodsData} 
+                    methods={sortedMethods} 
                     onSelectMethod={handleSelectMethod}
                     onVote={handleVote}
                     votes={votes}
                     userVotes={userVotes}
+                    onSortChange={setSortOrder}
                 />;
         }
     };
 
     return (
         <main className="bg-gray-50 min-h-screen font-sans">
-            <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} />
+            <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} onFeedback={handleFeedback} />
             {renderPage()}
         </main>
     );
