@@ -1,9 +1,9 @@
 /* global __firebase_config, __initial_auth_token */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signInAnonymously, signOut, signInWithCustomToken } from "firebase/auth";
-import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy, setLogLevel } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 
 // --- Firebase Configuration ---
 // This will be replaced by the environment's configuration.
@@ -16,9 +16,6 @@ const firebaseConfig = typeof __firebase_config !== 'undefined'
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-
-// Enable Firestore logging for easier debugging
-// setLogLevel('debug');
 
 // --- Data for SIBO Methods with Evidence Tiers & Citations ---
 const siboMethodsData = [
@@ -677,6 +674,9 @@ const CommentsSection = ({ methodId, user }) => {
     );
 };
 
+// Helper function for delays to avoid eslint warnings
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // --- Gemini AI Advisor Component ---
 const GeminiAdvisor = ({ methods, onClose }) => {
     const allSymptoms = [...new Set(methods.flatMap(m => m.commonSymptoms))];
@@ -738,7 +738,7 @@ const GeminiAdvisor = ({ methods, onClose }) => {
                     break;
                 } else if (response.status === 429 || response.status >= 500) {
                     console.warn(`Retrying... attempts left: ${retries - 1}`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await wait(delay);
                     delay *= 2; // Exponential backoff
                     retries--;
                 } else {
