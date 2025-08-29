@@ -1,3 +1,4 @@
+/* global __firebase_config, __initial_auth_token */
 import React, { useState, useEffect, useRef } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
