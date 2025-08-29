@@ -1,26 +1,19 @@
 import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged, signInAnonymously, signOut, signInWithCustomToken } from "firebase/auth";
 import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 
 // --- Firebase Configuration ---
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDh0lTXhQvS_TeR5GqAC2v31qrK0oZIIJM",
-  authDomain: "sibo-recovery-app.firebaseapp.com",
-  projectId: "sibo-recovery-app",
-  storageBucket: "sibo-recovery-app.appspot.com",
-  messagingSenderId: "1000892499513",
-  appId: "1:1000892499513:web:e97b14d06004f52be9afe8",
-  measurementId: "G-50MYVFXV5H"
-};
-
+// This will be replaced by the environment's configuration.
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+    ? JSON.parse(__firebase_config)
+    : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Get a reference to the Firestore database
 const db = getFirestore(app);
-
+const auth = getAuth(app);
 
 // --- Data for SIBO Methods with Evidence Tiers & Citations ---
 const siboMethodsData = [
@@ -424,14 +417,14 @@ const AiPatternAnalysis = () => {
     );
 };
 
-// --- New Header Component for Login/Logout ---
+// --- Header Component using Firebase Auth ---
 const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
-        netlifyIdentity.open('login');
+        signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
     };
 
     const handleLogout = () => {
-        netlifyIdentity.logout();
+        signOut(auth).catch(error => console.error("Sign-out failed:", error));
     };
 
     return (
@@ -446,14 +439,14 @@ const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
                 </button>
                 {user ? (
                     <div className="flex items-center space-x-4">
-                        <span className="text-gray-600">Welcome, {user.user_metadata.full_name || user.email}</span>
+                        <span className="text-gray-600 text-sm hidden sm:inline">Welcome, User {user.uid.substring(0, 6)}...</span>
                         <button onClick={handleLogout} className="font-semibold text-red-600 hover:text-red-800">
                             Log Out
                         </button>
                     </div>
                 ) : (
                     <button onClick={handleLogin} className="font-semibold text-blue-600 hover:text-blue-800">
-                        Log In / Sign Up
+                        Sign In to Vote & Comment
                     </button>
                 )}
             </div>
@@ -494,12 +487,18 @@ const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => {
     );
 };
 
-const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange }) => {
+const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange, onOpenAdvisor }) => {
     return (
         <div className="p-4 sm:p-6 md:p-8">
             <header className="text-center mb-10">
                 <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">Community-Sourced SIBO Protocols</h1>
                 <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">Explore recovery methods backed by community experience and scientific evidence. Vote on what you've tried and see what has worked for others.</p>
+                 <button 
+                    onClick={onOpenAdvisor}
+                    className="mt-6 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ease-in-out"
+                >
+                    ✨ Get Help from AI Protocol Advisor
+                </button>
             </header>
             
             <div className="flex justify-end mb-6">
@@ -610,15 +609,16 @@ const MethodDetailPage = ({ method, onBack, user }) => {
 const CommentsSection = ({ methodId, user }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState("");
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
-            const fetchedComments = [];
-            snapshot.forEach(doc => {
-                fetchedComments.push({ id: doc.id, ...doc.data() });
-            });
+            const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setComments(fetchedComments);
+        }, (err) => {
+            console.error("Error fetching comments:", err);
+            setError("Could not load comments. Please try again later.");
         });
         return () => unsubscribe();
     }, [methodId]);
@@ -627,13 +627,18 @@ const CommentsSection = ({ methodId, user }) => {
         e.preventDefault();
         if (!newComment.trim() || !user) return;
 
-        await addDoc(collection(db, `methods/${methodId}/comments`), {
-            text: newComment,
-            userName: user.user_metadata.full_name || user.email,
-            userId: user.id,
-            timestamp: serverTimestamp()
-        });
-        setNewComment("");
+        try {
+            await addDoc(collection(db, `methods/${methodId}/comments`), {
+                text: newComment,
+                userName: `User ${user.uid.substring(0, 6)}...`,
+                userId: user.uid,
+                timestamp: serverTimestamp()
+            });
+            setNewComment("");
+        } catch (err) {
+            console.error("Error posting comment:", err);
+            setError("Failed to post comment.");
+        }
     };
 
     return (
@@ -655,18 +660,19 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">Log in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">Sign in</button> to join the discussion.</p>
                     </div>
                 )}
+                {error && <p className="text-red-500 mb-4">{error}</p>}
                 <div className="space-y-6">
                     {comments.length > 0 ? (
                         comments.map(comment => (
-                            <div key={comment.id} className="border-b border-gray-200 pb-4">
+                            <div key={comment.id} className="border-b border-gray-200 pb-4 last:border-b-0">
                                 <p className="font-semibold text-gray-800">{comment.userName}</p>
                                 <p className="text-xs text-gray-500 mb-2">
                                     {comment.timestamp ? new Date(comment.timestamp.toDate()).toLocaleString() : 'Just now'}
                                 </p>
-                                <p className="text-gray-700">{comment.text}</p>
+                                <p className="text-gray-700 whitespace-pre-wrap">{comment.text}</p>
                             </div>
                         ))
                     ) : (
@@ -702,8 +708,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
         try {
             await addDoc(collection(db, 'submissions'), {
                 ...formData,
-                submittedBy: user.email,
-                userId: user.id,
+                submittedBy: user.uid,
                 submittedAt: serverTimestamp()
             });
             alert("Thank you for your submission! It will be reviewed shortly.");
@@ -720,7 +725,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit a new method. This helps us keep the submissions genuine.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
@@ -781,8 +786,7 @@ const FeedbackPage = ({ onBack, user }) => {
         try {
             await addDoc(collection(db, 'feedback'), {
                 feedbackText: feedback,
-                submittedBy: user.email,
-                userId: user.id,
+                submittedBy: user.uid,
                 submittedAt: serverTimestamp()
             });
             alert("Thank you for your feedback!");
@@ -799,7 +803,7 @@ const FeedbackPage = ({ onBack, user }) => {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit Feedback</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => window.netlifyIdentity.open('login')} className="font-semibold text-blue-600 hover:underline">log in</button> to submit feedback.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit feedback.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
@@ -834,36 +838,29 @@ export default function App() {
     const [selectedMethodId, setSelectedMethodId] = useState(null);
     const [votes, setVotes] = useState({});
     const [userVotes, setUserVotes] = useState({});
-    const [user, setUser] = useState(null); // State to hold the current user
+    const [user, setUser] = useState(null);
+    const [authReady, setAuthReady] = useState(false);
+    const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
     const [sortOrder, setSortOrder] = useState('evidence'); // 'evidence' or 'likes'
 
-    // --- useEffect for Authentication ---
+    // --- useEffect for Firebase Authentication ---
     useEffect(() => {
-        if (window.netlifyIdentity) {
-            window.netlifyIdentity.init();
-            const currentUser = window.netlifyIdentity.currentUser();
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
+            } else {
+                if (typeof __initial_auth_token === 'undefined') {
+                    await signInAnonymously(auth).catch(e => console.error("Auto sign-in failed", e));
+                } else {
+                    await signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Token sign-in failed", e));
+                }
             }
-
-            window.netlifyIdentity.on('login', (user) => {
-                setUser(user);
-                window.netlifyIdentity.close();
-            });
-
-            window.netlifyIdentity.on('logout', () => {
-                setUser(null);
-                setUserVotes({}); // Clear local votes on logout
-            });
-
-             return () => {
-                window.netlifyIdentity.off('login');
-                window.netlifyIdentity.off('logout');
-            };
-        }
+            setAuthReady(true);
+        });
+        return () => unsubscribe();
     }, []);
 
-    // --- useEffect to fetch votes from Firebase ---
+    // --- useEffect to fetch all votes from Firebase ---
     useEffect(() => {
         const votesCollection = collection(db, 'votes');
         const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
@@ -882,7 +879,7 @@ export default function App() {
     // --- useEffect to fetch the logged-in user's specific votes ---
     useEffect(() => {
         if (user) {
-            const userVotesCollection = collection(db, `users/${user.id}/userVotes`);
+            const userVotesCollection = collection(db, `users/${user.uid}/userVotes`);
             const unsubscribe = onSnapshot(userVotesCollection, (snapshot) => {
                 const userVotesData = {};
                 snapshot.forEach(doc => {
@@ -891,6 +888,8 @@ export default function App() {
                 setUserVotes(userVotesData);
             });
             return () => unsubscribe();
+        } else {
+            setUserVotes({});
         }
     }, [user]);
 
@@ -920,29 +919,24 @@ export default function App() {
         setCurrentPage('feedback');
     };
 
-    // --- Updated handleVote function to require login ---
+    // --- Updated handleVote function with Firebase Auth ---
     const handleVote = async (id, voteType) => {
         if (!user) {
-            window.netlifyIdentity.open('login');
+            signInAnonymously(auth).catch(e => console.error("Sign-in for vote failed", e));
             return;
         }
 
         const existingVote = userVotes[id];
         const methodId = String(id);
         const voteDocRef = doc(db, 'votes', methodId);
-        const userVoteDocRef = doc(db, `users/${user.id}/userVotes`, methodId);
+        const userVoteDocRef = doc(db, `users/${user.uid}/userVotes`, methodId);
 
         try {
             await runTransaction(db, async (transaction) => {
                 const voteDoc = await transaction.get(voteDocRef);
                 
-                let newLikes = 0;
-                let newDislikes = 0;
-
-                if (voteDoc.exists()) {
-                    newLikes = voteDoc.data().likes || 0;
-                    newDislikes = voteDoc.data().dislikes || 0;
-                }
+                let newLikes = voteDoc.exists() ? voteDoc.data().likes || 0 : 0;
+                let newDislikes = voteDoc.exists() ? voteDoc.data().dislikes || 0 : 0;
 
                 if (existingVote === 'like') newLikes--;
                 if (existingVote === 'dislike') newDislikes--;
@@ -963,18 +957,6 @@ export default function App() {
                     transaction.set(userVoteDocRef, { vote: voteType });
                 }
             });
-
-             // Update local state after successful transaction
-            setUserVotes(prevUserVotes => {
-                const newUserVotes = { ...prevUserVotes };
-                if (existingVote === voteType) {
-                    delete newUserVotes[id];
-                } else {
-                    newUserVotes[id] = voteType;
-                }
-                return newUserVotes;
-            });
-
         } catch (e) {
             console.error("Transaction failed: ", e);
         }
@@ -991,6 +973,14 @@ export default function App() {
     });
 
     const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
+    
+    if (!authReady) {
+        return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-50">
+                <p className="text-gray-600">Loading Community Hub...</p>
+            </div>
+        );
+    }
 
     const renderPage = () => {
         switch (currentPage) {
@@ -1009,6 +999,7 @@ export default function App() {
                     votes={votes}
                     userVotes={userVotes}
                     onSortChange={setSortOrder}
+                    onOpenAdvisor={() => setIsAdvisorOpen(true)}
                 />;
         }
     };
@@ -1016,6 +1007,7 @@ export default function App() {
     return (
         <main className="bg-gray-50 min-h-screen font-sans">
             <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} onFeedback={handleFeedback} />
+            {isAdvisorOpen && <GeminiAdvisor methods={siboMethodsData} onClose={() => setIsAdvisorOpen(false)} />}
             {renderPage()}
         </main>
     );
