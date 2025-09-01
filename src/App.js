@@ -846,22 +846,30 @@ export default function App() {
 
     // --- useEffect for Firebase Authentication ---
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-            } else {
-                // If no token, sign in anonymously
-                if (typeof __initial_auth_token === 'undefined') {
-                    await signInAnonymously(auth).catch(e => console.error("Auto sign-in failed", e));
-                } else {
-                    // Use the provided token if available
-                    await signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Token sign-in failed", e));
+        // This effect handles the initial authentication check using a token, if available.
+        const initialAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && !auth.currentUser) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (e) {
+                    console.error("Token sign-in failed", e);
                 }
             }
             setAuthReady(true);
+        };
+
+        initialAuth();
+
+        // This listener keeps the user state in sync with Firebase Auth changes.
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            if (!authReady) {
+                setAuthReady(true);
+            }
         });
+
         return () => unsubscribe();
-    }, []);
+    }, [authReady]);
 
     // --- useEffect to fetch all votes from Firebase ---
     useEffect(() => {
