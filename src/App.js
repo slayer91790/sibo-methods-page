@@ -846,30 +846,29 @@ export default function App() {
 
     // --- useEffect for Firebase Authentication ---
     useEffect(() => {
-        // This effect handles the initial authentication check using a token, if available.
-        const initialAuth = async () => {
+        // onAuthStateChanged returns an unsubscriber. This is the single source of truth.
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setAuthReady(true);
+        });
+
+        // Handle initial token-based sign-in for the environment, if provided.
+        const initialSignIn = async () => {
             if (typeof __initial_auth_token !== 'undefined' && !auth.currentUser) {
                 try {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } catch (e) {
-                    console.error("Token sign-in failed", e);
+                    console.error("Initial token sign-in failed:", e);
+                    // The listener above will still set authReady, ensuring the app loads.
                 }
             }
-            setAuthReady(true);
         };
+        
+        initialSignIn();
 
-        initialAuth();
-
-        // This listener keeps the user state in sync with Firebase Auth changes.
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            if (!authReady) {
-                setAuthReady(true);
-            }
-        });
-
+        // Cleanup subscription on unmount
         return () => unsubscribe();
-    }, [authReady]);
+    }, []); // Empty dependency array ensures this effect runs only once on mount
 
     // --- useEffect to fetch all votes from Firebase ---
     useEffect(() => {
@@ -1000,3 +999,4 @@ export default function App() {
         </main>
     );
 }
+
