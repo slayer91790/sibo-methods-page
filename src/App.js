@@ -1,4 +1,3 @@
-/* global __firebase_config, __initial_auth_token */
 import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
@@ -7,7 +6,6 @@ import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serv
 
 // --- Firebase Configuration ---
 // This will be replaced by the environment's configuration.
-// It's good practice to not hardcode credentials.
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
     ? JSON.parse(__firebase_config)
     : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
@@ -346,7 +344,7 @@ const ThumbsUpIcon = ({ isSelected }) => (
 
 const ThumbsDownIcon = ({ isSelected }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326-.02.485.06L17 5.266V18a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 5.266V18a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4z" />
   </svg>
 );
 
@@ -420,7 +418,7 @@ const AiPatternAnalysis = () => {
 };
 
 // --- Header Component using Firebase Auth ---
-const Header = ({ user }) => {
+const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
         signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
     };
@@ -431,8 +429,14 @@ const Header = ({ user }) => {
 
     return (
         <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-            <h1 className="text-xl font-bold text-gray-800">SIBO Recovery Hub</h1>
-            <div>
+            <button onClick={onGoHome} className="text-xl font-bold text-gray-800">SIBO Recovery Hub</button>
+            <div className="flex items-center space-x-4">
+                 <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
+                    Submit a Method
+                </button>
+                 <button onClick={onFeedback} className="font-semibold text-purple-600 hover:text-purple-800">
+                    Feedback
+                </button>
                 {user ? (
                     <div className="flex items-center space-x-4">
                         <span className="text-gray-600 text-sm hidden sm:inline">Welcome, User {user.uid.substring(0, 6)}...</span>
@@ -483,9 +487,7 @@ const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => {
     );
 };
 
-const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onOpenAdvisor }) => {
-    const sortedMethods = [...methods].sort((a, b) => b.evidenceTier - a.evidenceTier);
-    
+const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange, onOpenAdvisor }) => {
     return (
         <div className="p-4 sm:p-6 md:p-8">
             <header className="text-center mb-10">
@@ -498,8 +500,16 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onO
                     ✨ Get Help from AI Protocol Advisor
                 </button>
             </header>
+            
+            <div className="flex justify-end mb-6">
+                <select onChange={(e) => onSortChange(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <option value="evidence">Sort by Evidence Tier</option>
+                    <option value="likes">Sort by Most Likes</option>
+                </select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {sortedMethods.map(method => (
+                {methods.map(method => (
                     <MethodCard 
                         key={method.id} 
                         method={method} 
@@ -540,7 +550,7 @@ const MethodDetailPage = ({ method, onBack, user }) => {
                 )}
             </div>
 
-            {/* --- Symptoms Section --- */}
+            {/* --- New Symptoms Section --- */}
             {method.commonSymptoms && (
                  <div className="mb-8">
                     <h3 className="font-bold text-lg mb-2 text-gray-800">Best For These Symptoms:</h3>
@@ -595,7 +605,7 @@ const MethodDetailPage = ({ method, onBack, user }) => {
     );
 };
 
-// --- Comments Section Component ---
+// --- New Comments Section Component ---
 const CommentsSection = ({ methodId, user }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState("");
@@ -674,161 +684,150 @@ const CommentsSection = ({ methodId, user }) => {
     );
 };
 
-// Helper function for delays to avoid eslint warnings
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// --- New Submit Method Page Component ---
+const SubmitMethodPage = ({ onBack, user }) => {
+    const [formData, setFormData] = useState({
+        title: '',
+        summary: '',
+        sourceLink: '',
+        symptoms: '',
+        protocol: '',
+        sampleDay: ''
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-// --- Gemini AI Advisor Component ---
-const GeminiAdvisor = ({ methods, onClose }) => {
-    const allSymptoms = [...new Set(methods.flatMap(m => m.commonSymptoms))];
-    const [selectedSymptoms, setSelectedSymptoms] = useState([]);
-    const [analysis, setAnalysis] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    const handleSymptomToggle = (symptom) => {
-        setSelectedSymptoms(prev => 
-            prev.includes(symptom) 
-                ? prev.filter(s => s !== symptom) 
-                : [...prev, symptom]
-        );
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const getGeminiAnalysis = async () => {
-        if (selectedSymptoms.length === 0) {
-            setError("Please select at least one symptom.");
-            return;
-        }
-        setIsLoading(true);
-        setError("");
-        setAnalysis("");
-
-        const systemPrompt = `You are a helpful SIBO recovery assistant. Your role is to analyze a user's symptoms and a list of SIBO treatment protocols. Based on the user's symptoms, you will provide a brief, educational summary of which protocols might be relevant for them to research further and discuss with their doctor.
-
-        **IMPORTANT RULES:**
-        1.  **DO NOT PROVIDE MEDICAL ADVICE.** Start every response with a clear disclaimer: "This is not medical advice and is for informational purposes only. Always consult with a qualified healthcare professional before making any health decisions."
-        2.  Analyze the provided protocols based *only* on the 'commonSymptoms' listed for each.
-        3.  Explain *why* certain protocols are suggested based on the symptom overlap.
-        4.  Keep the tone helpful, neutral, and educational.
-        5.  Format the output clearly using markdown for readability. Use headings for each suggested protocol.`;
-
-        const userQuery = `My primary symptoms are: ${selectedSymptoms.join(', ')}. Please analyze the following SIBO protocols and tell me which ones might be relevant for these symptoms:\n\n${JSON.stringify(methods, null, 2)}`;
-        
-        const apiKey = ""; 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            },
-        };
-
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!user) return;
+        setIsSubmitting(true);
         try {
-            let response;
-            let retries = 3;
-            let delay = 1000;
-            while (retries > 0) {
-                response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    break;
-                } else if (response.status === 429 || response.status >= 500) {
-                    console.warn(`Retrying... attempts left: ${retries - 1}`);
-                    await wait(delay);
-                    delay *= 2; // Exponential backoff
-                    retries--;
-                } else {
-                    throw new Error(`API request failed with status ${response.status}`);
-                }
-            }
-
-            if (!response.ok) {
-                 throw new Error(`API request failed after multiple retries with status ${response.status}`);
-            }
-
-            const result = await response.json();
-            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (text) {
-                setAnalysis(text);
-            } else {
-                throw new Error("Failed to get a valid response from the AI.");
-            }
-        } catch (err) {
-            console.error("Gemini API call failed:", err);
-            setError("Sorry, something went wrong while analyzing the protocols. Please try again later.");
+            await addDoc(collection(db, 'submissions'), {
+                ...formData,
+                submittedBy: user.uid,
+                submittedAt: serverTimestamp()
+            });
+            alert("Thank you for your submission! It will be reviewed shortly.");
+            onBack();
+        } catch (error) {
+            console.error("Error submitting form: ", error);
+            alert("Sorry, there was an error submitting your form. Please try again.");
         } finally {
-            setIsLoading(false);
+            setIsSubmitting(false);
         }
     };
+
+    if (!user) {
+        return (
+            <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
+                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
+            </div>
+        )
+    }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-gray-800">✨ AI Protocol Advisor</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800">&times;</button>
+        <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
+             <button onClick={onBack} className="mb-8 flex items-center text-blue-600 hover:text-blue-800 font-semibold">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back to All Methods
+            </button>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6">Submit a New Recovery Method</h1>
+            <p className="text-gray-600 mb-8">Thank you for contributing to the community! Please provide as much detail as possible. Your submission will be reviewed before being published.</p>
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md border border-gray-200">
+                <div>
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700">Method Title</label>
+                    <input type="text" name="title" id="title" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Low-Dose Naltrexone (LDN) Protocol" value={formData.title} onChange={handleChange} />
                 </div>
-                <div className="p-6 overflow-y-auto">
-                    {!analysis && !isLoading && (
-                        <>
-                            <p className="text-gray-600 mb-4">Select your primary symptoms, and our AI assistant will highlight protocols that are commonly associated with them. This is for informational purposes to help guide your research.</p>
-                            <div className="mb-6">
-                                <h3 className="font-semibold text-lg mb-3">Your Symptoms:</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {allSymptoms.map(symptom => (
-                                        <button 
-                                            key={symptom}
-                                            onClick={() => handleSymptomToggle(symptom)}
-                                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedSymptoms.includes(symptom) ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                                        >
-                                            {symptom}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </>
-                    )}
+                 <div>
+                    <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Short Summary</label>
+                    <textarea name="summary" id="summary" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Briefly describe the method and its main principle." value={formData.summary} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="sourceLink" className="block text-sm font-medium text-gray-700">Link to Source (Optional)</label>
+                    <input type="url" name="sourceLink" id="sourceLink" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Reddit post, blog, or article URL" value={formData.sourceLink} onChange={handleChange} />
+                </div>
+                <div>
+                    <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700">What symptoms is this method best for?</label>
+                    <textarea name="symptoms" id="symptoms" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Methane-dominant SIBO, Chronic Constipation, Brain Fog" value={formData.symptoms} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="protocol" className="block text-sm font-medium text-gray-700">Full Protocol Details</label>
+                    <textarea name="protocol" id="protocol" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe the phases and steps in detail. Include dosages, timing, and duration." value={formData.protocol} onChange={handleChange}></textarea>
+                </div>
+                 <div>
+                    <label htmlFor="sampleDay" className="block text-sm font-medium text-gray-700">A Sample Day</label>
+                    <textarea name="sampleDay" id="sampleDay" rows="5" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe a typical day following this protocol from morning to night." value={formData.sampleDay} onChange={handleChange}></textarea>
+                </div>
+                <div>
+                    <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400">
+                        {isSubmitting ? 'Submitting...' : 'Submit for Review'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+};
 
-                    {isLoading && (
-                        <div className="text-center p-8">
-                            <p className="text-gray-600">Analyzing protocols... Please wait.</p>
-                        </div>
-                    )}
+// --- New Feedback Page Component ---
+const FeedbackPage = ({ onBack, user }) => {
+    const [feedback, setFeedback] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-                    {error && <p className="text-red-500 bg-red-50 p-3 rounded-md">{error}</p>}
-                    
-                    {analysis && (
-                        <div className="prose max-w-none">
-                            <h3 className="font-semibold text-lg mb-3">AI Analysis Results:</h3>
-                            {analysis.split('\n').map((line, index) => {
-                                if (line.startsWith('##')) {
-                                    return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line.replace('## ', '')}</h2>;
-                                }
-                                if (line.startsWith('**')) {
-                                     return <p key={index} className="font-bold text-red-600 bg-red-50 p-3 rounded-md">{line.replace(/\*\*/g, '')}</p>
-                                }
-                                return <p key={index}>{line}</p>;
-                            })}
-                        </div>
-                    )}
-                </div>
-                 <div className="p-6 border-t bg-gray-50 flex justify-end items-center space-x-4">
-                    {analysis ? (
-                        <button onClick={() => { setAnalysis(""); setSelectedSymptoms([]); }} className="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
-                            Start Over
-                        </button>
-                    ) : (
-                         <button onClick={getGeminiAnalysis} className="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400" disabled={isLoading || selectedSymptoms.length === 0}>
-                            {isLoading ? "Analyzing..." : "Get AI Analysis"}
-                        </button>
-                    )}
-                </div>
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!feedback.trim() || !user) return;
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, 'feedback'), {
+                feedbackText: feedback,
+                submittedBy: user.uid,
+                submittedAt: serverTimestamp()
+            });
+            alert("Thank you for your feedback!");
+            onBack();
+        } catch (error) {
+            console.error("Error submitting feedback: ", error);
+            alert("Sorry, there was an error submitting your feedback. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+     if (!user) {
+        return (
+            <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
+                 <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit Feedback</h1>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit feedback.</p>
+                 <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
+        )
+    }
+
+    return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
+            <button onClick={onBack} className="mb-8 flex items-center text-blue-600 hover:text-blue-800 font-semibold">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back to All Methods
+            </button>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6">Share Your Feedback</h1>
+            <p className="text-gray-600 mb-8">Have an idea to improve the site? Found a bug? Let us know! Your feedback is invaluable in making this a better resource for the community.</p>
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md border border-gray-200">
+                <div>
+                    <label htmlFor="feedback" className="block text-sm font-medium text-gray-700">Your Feedback</label>
+                    <textarea name="feedback" id="feedback" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Tell us what you think..." value={feedback} onChange={(e) => setFeedback(e.target.value)}></textarea>
+                </div>
+                <div>
+                    <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400">
+                        {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };
@@ -842,44 +841,35 @@ export default function App() {
     const [user, setUser] = useState(null);
     const [authReady, setAuthReady] = useState(false);
     const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
-
+    const [sortOrder, setSortOrder] = useState('evidence'); // 'evidence' or 'likes'
 
     // --- useEffect for Firebase Authentication ---
     useEffect(() => {
-        // onAuthStateChanged returns an unsubscriber. This is the single source of truth.
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setAuthReady(true);
-        });
-
-        // Handle initial token-based sign-in for the environment, if provided.
-        const initialSignIn = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && !auth.currentUser) {
-                try {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } catch (e) {
-                    console.error("Initial token sign-in failed:", e);
-                    // The listener above will still set authReady, ensuring the app loads.
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+            } else {
+                if (typeof __initial_auth_token === 'undefined') {
+                    await signInAnonymously(auth).catch(e => console.error("Auto sign-in failed", e));
+                } else {
+                    await signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Token sign-in failed", e));
                 }
             }
-        };
-        
-        initialSignIn();
-
-        // Cleanup subscription on unmount
+            setAuthReady(true);
+        });
         return () => unsubscribe();
-    }, []); // Empty dependency array ensures this effect runs only once on mount
+    }, []);
 
     // --- useEffect to fetch all votes from Firebase ---
     useEffect(() => {
         const votesCollection = collection(db, 'votes');
         const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
             const votesData = {};
+            siboMethodsData.forEach(method => {
+                votesData[String(method.id)] = { likes: 0, dislikes: 0 };
+            });
             snapshot.forEach(doc => {
-                votesData[doc.id] = {
-                    likes: doc.data().likes || 0,
-                    dislikes: doc.data().dislikes || 0,
-                };
+                votesData[doc.id] = doc.data();
             });
             setVotes(votesData);
         });
@@ -899,7 +889,7 @@ export default function App() {
             });
             return () => unsubscribe();
         } else {
-            setUserVotes({}); // Clear votes if user logs out
+            setUserVotes({});
         }
     }, [user]);
 
@@ -912,6 +902,21 @@ export default function App() {
     const handleBack = () => {
         setSelectedMethodId(null);
         setCurrentPage('list');
+    };
+    
+    const handleGoHome = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('list');
+    };
+
+    const handleSubmitMethod = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('submit');
+    };
+    
+    const handleFeedback = () => {
+        setSelectedMethodId(null);
+        setCurrentPage('feedback');
     };
 
     // --- Updated handleVote function with Firebase Auth ---
@@ -933,28 +938,22 @@ export default function App() {
                 let newLikes = voteDoc.exists() ? voteDoc.data().likes || 0 : 0;
                 let newDislikes = voteDoc.exists() ? voteDoc.data().dislikes || 0 : 0;
 
-                // Revert previous vote if it exists
                 if (existingVote === 'like') newLikes--;
                 if (existingVote === 'dislike') newDislikes--;
                 
-                // Apply new vote if it's different from the old one
                 if (existingVote !== voteType) {
                     if (voteType === 'like') newLikes++;
                     if (voteType === 'dislike') newDislikes++;
                 }
 
-                // Update the main votes document
                 transaction.set(voteDocRef, { 
                     likes: Math.max(0, newLikes), 
                     dislikes: Math.max(0, newDislikes) 
                 }, { merge: true });
 
-                // Update or delete the user's specific vote document
                 if (existingVote === voteType) {
-                    // User is un-voting
                     transaction.delete(userVoteDocRef);
                 } else {
-                    // User is casting a new vote
                     transaction.set(userVoteDocRef, { vote: voteType });
                 }
             });
@@ -963,8 +962,18 @@ export default function App() {
         }
     };
 
-    const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
+    const sortedMethods = [...siboMethodsData].sort((a, b) => {
+        if (sortOrder === 'likes') {
+            const likesA = votes[a.id]?.likes || 0;
+            const likesB = votes[b.id]?.likes || 0;
+            return likesB - likesA;
+        }
+        // Default to evidence tier sort
+        return b.evidenceTier - a.evidenceTier;
+    });
 
+    const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
+    
     if (!authReady) {
         return (
             <div className="flex justify-center items-center min-h-screen bg-gray-50">
@@ -973,30 +982,33 @@ export default function App() {
         );
     }
 
-    return (
-        <main className="bg-gray-50 min-h-screen font-sans">
-            <Header user={user} />
-
-            {isAdvisorOpen && <GeminiAdvisor methods={siboMethodsData} onClose={() => setIsAdvisorOpen(false)} />}
-
-            {currentPage === 'list' && (
-                <MethodListPage 
-                    methods={siboMethodsData} 
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'detail':
+                return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
+            case 'submit':
+                return <SubmitMethodPage onBack={handleBack} user={user} />;
+            case 'feedback':
+                return <FeedbackPage onBack={handleBack} user={user} />;
+            case 'list':
+            default:
+                return <MethodListPage 
+                    methods={sortedMethods} 
                     onSelectMethod={handleSelectMethod}
                     onVote={handleVote}
                     votes={votes}
                     userVotes={userVotes}
+                    onSortChange={setSortOrder}
                     onOpenAdvisor={() => setIsAdvisorOpen(true)}
-                />
-            )}
-            {currentPage === 'detail' && selectedMethod && (
-                <MethodDetailPage 
-                    method={selectedMethod} 
-                    onBack={handleBack} 
-                    user={user}
-                />
-            )}
+                />;
+        }
+    };
+
+    return (
+        <main className="bg-gray-50 min-h-screen font-sans">
+            <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} onFeedback={handleFeedback} />
+            {isAdvisorOpen && <GeminiAdvisor methods={siboMethodsData} onClose={() => setIsAdvisorOpen(false)} />}
+            {renderPage()}
         </main>
     );
 }
-
