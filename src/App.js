@@ -1,3 +1,4 @@
+/* global __initial_auth_token */
 import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
@@ -5,15 +6,34 @@ import { getAuth, onAuthStateChanged, signInAnonymously, signOut, signInWithCust
 import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 
 // --- Firebase Configuration ---
-// This will be replaced by the environment's configuration.
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-    ? JSON.parse(__firebase_config)
-    : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
+// This is the CORRECT configuration. It reads the secret keys
+// you added to your Netlify "Environment variables" settings.
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID
+};
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+// --- Helper function to check if the config is valid ---
+// This prevents the app from crashing if the variables are missing.
+const isFirebaseConfigValid = () => {
+    return Object.values(firebaseConfig).every(value => value);
+}
+
+// --- Initialize Firebase ---
+// We only initialize Firebase if the configuration is valid.
+let app;
+let db;
+let auth;
+
+if (isFirebaseConfigValid()) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+}
 
 // --- Data for SIBO Methods with Evidence Tiers & Citations ---
 const siboMethodsData = [
@@ -420,11 +440,15 @@ const AiPatternAnalysis = () => {
 // --- Header Component using Firebase Auth ---
 const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
-        signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
+        if (auth) {
+            signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
+        }
     };
 
     const handleLogout = () => {
-        signOut(auth).catch(error => console.error("Sign-out failed:", error));
+        if (auth) {
+            signOut(auth).catch(error => console.error("Sign-out failed:", error));
+        }
     };
 
     return (
@@ -544,9 +568,9 @@ const MethodDetailPage = ({ method, onBack, user }) => {
                 <div className="mb-2"><EvidenceTierBadge tier={method.evidenceTier} /></div>
                 <p className="text-sm">{method.citation.text}</p>
                 {method.citation.url && (
-                     <a href={method.citation.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-600 hover:underline mt-2 inline-block">
-                        View Study →
-                    </a>
+                       <a href={method.citation.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-600 hover:underline mt-2 inline-block">
+                            View Study →
+                        </a>
                 )}
             </div>
 
@@ -612,6 +636,7 @@ const CommentsSection = ({ methodId, user }) => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        if (!db) return;
         const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
             const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -625,7 +650,7 @@ const CommentsSection = ({ methodId, user }) => {
 
     const handleCommentSubmit = async (e) => {
         e.preventDefault();
-        if (!newComment.trim() || !user) return;
+        if (!newComment.trim() || !user || !db) return;
 
         try {
             await addDoc(collection(db, `methods/${methodId}/comments`), {
@@ -660,7 +685,7 @@ const CommentsSection = ({ methodId, user }) => {
                     </form>
                 ) : (
                     <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <p className="text-gray-600">Want to share your experience? <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">Sign in</button> to join the discussion.</p>
+                        <p className="text-gray-600">Want to share your experience? <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">Sign in</button> to join the discussion.</p>
                     </div>
                 )}
                 {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -703,7 +728,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!user) return;
+        if (!user || !db) return;
         setIsSubmitting(true);
         try {
             await addDoc(collection(db, 'submissions'), {
@@ -711,6 +736,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
                 submittedBy: user.uid,
                 submittedAt: serverTimestamp()
             });
+            // Changed alert to a more modern notification if possible, but alert is fine for now.
             alert("Thank you for your submission! It will be reviewed shortly.");
             onBack();
         } catch (error) {
@@ -725,7 +751,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit a Method</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit a new method. This helps us keep the submissions genuine.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit a new method. This helps us keep the submissions genuine.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
@@ -781,7 +807,7 @@ const FeedbackPage = ({ onBack, user }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!feedback.trim() || !user) return;
+        if (!feedback.trim() || !user || !db) return;
         setIsSubmitting(true);
         try {
             await addDoc(collection(db, 'feedback'), {
@@ -803,7 +829,7 @@ const FeedbackPage = ({ onBack, user }) => {
         return (
             <div className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto text-center">
                  <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Submit Feedback</h1>
-                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit feedback.</p>
+                 <p className="text-lg text-gray-600 mb-8">Please <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">sign in</button> to submit feedback.</p>
                  <button onClick={onBack} className="font-semibold text-blue-600 hover:text-blue-800">Back to All Methods</button>
             </div>
         )
@@ -832,6 +858,127 @@ const FeedbackPage = ({ onBack, user }) => {
     );
 };
 
+// --- Gemini AI Advisor Component ---
+const GeminiAdvisor = ({ methods, onClose }) => {
+    // Collect all unique symptoms from the data
+    const allSymptoms = [...new Set(methods.flatMap(m => m.commonSymptoms))];
+    const [selectedSymptoms, setSelectedSymptoms] = useState([]);
+    const [advice, setAdvice] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const toggleSymptom = (symptom) => {
+        setSelectedSymptoms(prev => 
+            prev.includes(symptom) ? prev.filter(s => s !== symptom) : [...prev, symptom]
+        );
+    };
+
+    const getAdvice = async () => {
+        if (selectedSymptoms.length === 0) {
+            setAdvice("Please select at least one symptom to get advice.");
+            return;
+        }
+        setIsLoading(true);
+        setAdvice('');
+
+        const simplifiedMethods = methods.map(m => ({
+            title: m.title,
+            summary: m.summary,
+            evidenceTier: m.evidenceTier,
+            commonSymptoms: m.commonSymptoms
+        }));
+
+        const systemPrompt = `You are an AI assistant for a SIBO recovery website. Your role is to provide a helpful, non-medical summary based on user-reported symptoms and a list of community-sourced treatment protocols.
+
+        **IMPORTANT RULES:**
+        1.  **DO NOT PROVIDE MEDICAL ADVICE.** Start every single response with this exact disclaimer: "This is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment."
+        2.  Analyze the user's selected symptoms and the provided list of protocols.
+        3.  Identify which protocols are most relevant to the user's symptoms based on the 'commonSymptoms' listed for each protocol.
+        4.  Summarize your findings in a clear, concise, and easy-to-understand manner (2-3 short paragraphs).
+        5.  Mention the 'evidenceTier' to help users understand the scientific backing of a protocol.
+        6.  Your tone should be helpful, empathetic, and strictly informational.
+        7.  Do not invent information or suggest protocols not on the list.`;
+
+        const userQuery = `My primary symptoms are: ${selectedSymptoms.join(', ')}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?
+
+        Protocols Data:
+        ${JSON.stringify(simplifiedMethods, null, 2)}`;
+        
+        const apiKey = ""; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+        };
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                throw new Error(`API call failed with status: ${response.status}`);
+            }
+            const result = await response.json();
+            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+                setAdvice(text);
+            } else {
+                setAdvice("Sorry, I couldn't generate advice at this time. The response from the AI was empty.");
+            }
+        } catch (error) {
+            console.error("Gemini API call failed:", error);
+            setAdvice("Sorry, there was an error getting advice from the AI. Please check your connection and try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">✨ AI Protocol Advisor</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+                        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="mb-6">
+                    <p className="text-gray-600 mb-4 font-medium">Select your primary symptoms to get a personalized summary.</p>
+                    <div className="flex flex-wrap gap-2">
+                        {allSymptoms.map(symptom => (
+                            <button 
+                                key={symptom} 
+                                onClick={() => toggleSymptom(symptom)}
+                                className={`px-4 py-2 text-sm font-semibold rounded-full border-2 transition-colors ${selectedSymptoms.includes(symptom) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                            >
+                                {symptom}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <button 
+                    onClick={getAdvice} 
+                    disabled={isLoading || selectedSymptoms.length === 0}
+                    className="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    {isLoading ? 'Analyzing...' : 'Get AI Advice'}
+                </button>
+
+                {advice && (
+                    <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Your Personalized Summary</h3>
+                        <p className="text-gray-700 whitespace-pre-wrap">{advice}</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 export default function App() {
     const [currentPage, setCurrentPage] = useState('list');
@@ -845,16 +992,13 @@ export default function App() {
 
     // --- useEffect for Firebase Authentication ---
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-            } else {
-                if (typeof __initial_auth_token === 'undefined') {
-                    await signInAnonymously(auth).catch(e => console.error("Auto sign-in failed", e));
-                } else {
-                    await signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Token sign-in failed", e));
-                }
-            }
+        if (!auth) {
+            setAuthReady(true);
+            return;
+        };
+
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
             setAuthReady(true);
         });
         return () => unsubscribe();
@@ -862,6 +1006,7 @@ export default function App() {
 
     // --- useEffect to fetch all votes from Firebase ---
     useEffect(() => {
+        if (!db) return;
         const votesCollection = collection(db, 'votes');
         const unsubscribe = onSnapshot(votesCollection, (snapshot) => {
             const votesData = {};
@@ -878,7 +1023,7 @@ export default function App() {
 
     // --- useEffect to fetch the logged-in user's specific votes ---
     useEffect(() => {
-        if (user) {
+        if (user && db) {
             const userVotesCollection = collection(db, `users/${user.uid}/userVotes`);
             const unsubscribe = onSnapshot(userVotesCollection, (snapshot) => {
                 const userVotesData = {};
@@ -921,15 +1066,22 @@ export default function App() {
 
     // --- Updated handleVote function with Firebase Auth ---
     const handleVote = async (id, voteType) => {
-        if (!user) {
-            signInAnonymously(auth).catch(e => console.error("Sign-in for vote failed", e));
-            return;
+        if (!auth) return;
+        let currentUser = auth.currentUser;
+        if (!currentUser) {
+            try {
+                const userCredential = await signInAnonymously(auth);
+                currentUser = userCredential.user;
+            } catch (e) {
+                 console.error("Sign-in for vote failed", e);
+                 return;
+            }
         }
 
         const existingVote = userVotes[id];
         const methodId = String(id);
         const voteDocRef = doc(db, 'votes', methodId);
-        const userVoteDocRef = doc(db, `users/${user.uid}/userVotes`, methodId);
+        const userVoteDocRef = doc(db, `users/${currentUser.uid}/userVotes`, methodId);
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -973,6 +1125,17 @@ export default function App() {
     });
 
     const selectedMethod = siboMethodsData.find(m => m.id === selectedMethodId);
+    
+    if (!isFirebaseConfigValid()) {
+        return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-50 p-8">
+                <div className="text-center bg-white p-10 rounded-lg shadow-md">
+                    <h1 className="text-2xl font-bold text-red-600 mb-4">Configuration Error</h1>
+                    <p className="text-gray-700">The Firebase configuration is missing. If you are the site owner, please make sure you have set up your environment variables correctly in your hosting provider (e.g., Netlify).</p>
+                </div>
+            </div>
+        );
+    }
     
     if (!authReady) {
         return (
