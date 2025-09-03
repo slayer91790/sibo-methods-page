@@ -1,36 +1,37 @@
-/* global __firebase_config, __initial_auth_token */
 import React, { useState, useEffect } from 'react';
 // --- Import the functions you need from the Firebase SDKs ---
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signInAnonymously, signOut, signInWithCustomToken } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInAnonymously, signOut } from "firebase/auth";
 import { getFirestore, collection, doc, onSnapshot, runTransaction, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 
-// --- Firebase Configuration ---
-// This configuration reads from the global variables provided by the Canvas environment.
-// The 'process.env' version is for the live Netlify build.
-const firebaseConfig = typeof __firebase_config !== 'undefined'
-    ? JSON.parse(__firebase_config)
-    : {
-        // Fallback configuration to prevent crashes if the global variable is missing.
-        apiKey: "FALLBACK_API_KEY",
-        authDomain: "FALLBACK_AUTH_DOMAIN",
-        projectId: "FALLBACK_PROJECT_ID",
-        storageBucket: "FALLBACK_STORAGE_BUCKET",
-        messagingSenderId: "FALLBACK_SENDER_ID",
-        appId: "FALLBACK_APP_ID"
-    };
+// --- Firebase Configuration for LIVE Netlify Site ---
+// This correctly reads the secret keys from your Netlify Environment Variables.
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID
+};
 
+// --- Helper function to check if the config loaded from Netlify ---
+const isFirebaseConfigValid = () => {
+    return Object.values(firebaseConfig).every(value => value);
+};
 
 // --- Initialize Firebase ---
 let app;
 let db;
 let auth;
 
-// We only initialize Firebase if the configuration has been loaded.
-if (firebaseConfig.apiKey !== "FALLBACK_API_KEY") {
+// We only initialize Firebase if the configuration keys from Netlify are valid.
+if (isFirebaseConfigValid()) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
+} else {
+    console.error("Firebase configuration is missing or incomplete. Check Netlify environment variables.");
 }
 
 // --- Data for SIBO Methods with Evidence Tiers & Citations ---
