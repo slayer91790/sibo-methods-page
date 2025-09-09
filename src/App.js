@@ -58,7 +58,10 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
 const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
 
 // Helper to verify config
-const isFirebaseConfigValid = () => Object.values(firebaseConfig).every(Boolean);
+const isFirebaseConfigValid = () => {
+    // This function now correctly checks for missing or truly empty values.
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
+}
 
 // Initialize Firebase only if config present
 let app;
