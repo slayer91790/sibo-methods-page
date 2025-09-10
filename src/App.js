@@ -509,6 +509,32 @@ const AiPatternAnalysis = () => {
     );
 };
 
+const AudioSection = () => {
+    return (
+        <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">SIBO Educational Podcast</h2>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Understanding SIBO: An AI-Generated Overview</h3>
+                <p className="text-gray-600 mb-4">
+                    Listen to this AI-generated podcast discussing Small Intestinal Bacterial Overgrowth, its causes, symptoms, and treatment approaches.
+                </p>
+                <audio 
+                    controls 
+                    className="w-full"
+                    preload="metadata"
+                >
+                    <source src="YOUR_FIREBASE_STORAGE_URL_HERE" type="audio/mpeg" />
+                    <source src="YOUR_FIREBASE_STORAGE_URL_HERE" type="audio/wav" />
+                    Your browser does not support the audio element.
+                </source>
+                <p className="text-xs text-gray-500 mt-2">
+                    Note: This content is AI-generated for educational purposes. Always consult healthcare professionals for medical advice.
+                </p>
+            </div>
+        </div>
+    );
+};
+
 // ---------------- Header (Auth) ----------------
 const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
