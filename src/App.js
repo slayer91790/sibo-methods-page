@@ -630,6 +630,7 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onS
         </div>
 
         <AiPatternAnalysis />
+        <AudioSection />
         <EvidenceTierExplanation />
 
         <footer className="mt-12 px-4 text-center text-sm text-gray-500">
