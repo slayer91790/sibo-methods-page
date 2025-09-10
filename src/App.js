@@ -43,18 +43,18 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     // Use config from the dev canvas environment if it exists
     firebaseConfig = JSON.parse(__firebase_config);
 } else {
-    // Otherwise, build the config from environment variables for the live site
+    // For production, read directly from process.env at build time
     firebaseConfig = {
-      apiKey: readEnv('REACT_APP_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
-      authDomain: readEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
-      projectId: readEnv('REACT_APP_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
-      storageBucket: readEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
-      messagingSenderId: readEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
-      appId: readEnv('REACT_APP_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID,
     };
 }
 
-const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
 // Helper to verify config
 const isFirebaseConfigValid = () => {
