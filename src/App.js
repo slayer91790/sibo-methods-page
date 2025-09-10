@@ -58,6 +58,14 @@ const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
 
 // Helper to verify config
 const isFirebaseConfigValid = () => {
+    // Debug logging to see what we're getting
+    console.log('Firebase config check:', {
+        apiKey: firebaseConfig?.apiKey ? 'present' : 'missing',
+        authDomain: firebaseConfig?.authDomain ? 'present' : 'missing',
+        projectId: firebaseConfig?.projectId ? 'present' : 'missing',
+        config: firebaseConfig
+    });
+    
     // This function now correctly checks for missing or truly empty values.
     return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
 }
