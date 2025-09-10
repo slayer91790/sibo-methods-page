@@ -1,4 +1,4 @@
-/* global __initial_auth_token */
+/* global __initial_auth_token, __firebase_config */
 import React, { useState, useEffect } from 'react';
 // --- Firebase SDKs ---
 import { initializeApp } from 'firebase/app';
@@ -23,10 +23,11 @@ import {
 
 /**
  * SIBO Recovery Hub — single-file React SPA
- * This version incorporates community feedback for more robust functionality.
+ * This version uses a hybrid configuration loader to work in both
+ * the development canvas and on a live Netlify site.
  */
 
-// ---------------- Env helpers (CRA, or window.ENV on Netlify) ----------------
+// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
 const readEnv = (...keys) => {
   const win = typeof window !== 'undefined' ? window : {};
   for (const k of keys) {
@@ -38,21 +39,32 @@ const readEnv = (...keys) => {
   return '';
 };
 
+// --- Hybrid Firebase Configuration ---
+let firebaseConfig;
 
-// Firebase config — supports CRA (REACT_APP_) or plain names
-const firebaseConfig = {
-  apiKey: readEnv('REACT_APP_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
-  authDomain: readEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
-  projectId: readEnv('REACT_APP_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
-  storageBucket: readEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: readEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
-  appId: readEnv('REACT_APP_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
-};
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    // Use config from the dev canvas environment if it exists
+    firebaseConfig = JSON.parse(__firebase_config);
+} else {
+    // Otherwise, build the config from environment variables for the live site
+    firebaseConfig = {
+      apiKey: readEnv('REACT_APP_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
+      authDomain: readEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
+      projectId: readEnv('REACT_APP_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
+      storageBucket: readEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
+      messagingSenderId: readEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
+      appId: readEnv('REACT_APP_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+    };
+}
+
 
 const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
 
 // Helper to verify config
-const isFirebaseConfigValid = () => Object.values(firebaseConfig).every(Boolean);
+const isFirebaseConfigValid = () => {
+    // This function now correctly checks for missing or truly empty values.
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
+}
 
 // Initialize Firebase only if config present
 let app;
