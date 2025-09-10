@@ -27,6 +27,16 @@ import {
  * the development canvas and on a live Netlify site.
  */
 
+// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
+const readEnv = (...keys) => {
+  const win = typeof window !== 'undefined' ? window : {};
+  for (const k of keys) {
+    if (typeof process !== 'undefined' && process.env?.[k]) return process.env[k];
+    if (win.ENV?.[k]) return win.ENV[k];
+  }
+  return '';
+};
+
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -1101,17 +1111,9 @@ export default function App() {
             if (currentUser) {
                 setUser(currentUser);
             } else {
-                try {
-                    // In dev canvas, a token may be provided for auto-login
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        // On live site or otherwise, sign in anonymously
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    console.error('Auth sign-in failed.', e);
-                }
+                setUser(null);
+                // Note: We no longer auto-sign in users
+                // Users must explicitly click "Sign in with Google"
             }
             setAuthReady(true);
         });
