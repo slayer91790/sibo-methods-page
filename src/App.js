@@ -27,16 +27,6 @@ import {
  * the development canvas and on a live Netlify site.
  */
 
-// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
-const readEnv = (...keys) => {
-  const win = typeof window !== 'undefined' ? window : {};
-  for (const k of keys) {
-    if (typeof process !== 'undefined' && process.env?.[k]) return process.env[k];
-    if (win.ENV?.[k]) return win.ENV[k];
-  }
-  return '';
-};
-
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
