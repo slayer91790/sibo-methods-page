@@ -1,6 +1,80 @@
+/* global __initial_auth_token, __firebase_config */
 import React, { useState, useEffect } from 'react';
+// --- Firebase SDKs ---
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+  signOut,
+  signInWithCustomToken,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
+  runTransaction,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 
-// Mock data for SIBO methods (enhanced from original)
+/**
+ * SIBO Recovery Hub — single-file React SPA
+ * This version uses a hybrid configuration loader to work in both
+ * the development canvas and on a live Netlify site.
+ */
+
+// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
+const readEnv = (...keys) => {
+  const win = typeof window !== 'undefined' ? window : {};
+  for (const k of keys) {
+    if (typeof process !== 'undefined' && process.env?.[k]) return process.env[k];
+    if (win.ENV?.[k]) return win.ENV[k];
+  }
+  return '';
+};
+
+// --- Hybrid Firebase Configuration ---
+let firebaseConfig;
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    // Use config from the dev canvas environment if it exists
+    firebaseConfig = JSON.parse(__firebase_config);
+} else {
+    // Otherwise, build the config from environment variables for the live site
+    firebaseConfig = {
+      apiKey: readEnv('REACT_APP_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
+      authDomain: readEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
+      projectId: readEnv('REACT_APP_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
+      storageBucket: readEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
+      messagingSenderId: readEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
+      appId: readEnv('REACT_APP_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+    };
+}
+
+const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
+
+// Helper to verify config
+const isFirebaseConfigValid = () => {
+    // This function now correctly checks for missing or truly empty values.
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
+}
+
+// Initialize Firebase only if config present
+let app;
+let db;
+let auth;
+if (isFirebaseConfigValid()) {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+} else {
+  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
+}
+
+// ---------------- Data for SIBO Methods ----------------
 const siboMethodsData = [
     {
         id: 2,
@@ -39,11 +113,6 @@ const siboMethodsData = [
                     { title: "Gut Healing Support", description: "Introduce gut-healing nutrients such as L-glutamine, zinc carnosine, and bone broth to help repair the intestinal lining." }
                 ]
             }
-        ],
-        votes: { likes: 127, dislikes: 23 },
-        comments: [
-            { id: 1, userName: "User abc123...", text: "Worked well for me after 3 failed herbal attempts. Side effects were minimal.", timestamp: new Date('2024-08-15') },
-            { id: 2, userName: "User def456...", text: "Had to stop after 10 days due to severe nausea, but symptoms did improve.", timestamp: new Date('2024-08-20') }
         ]
     },
     {
@@ -111,11 +180,6 @@ const siboMethodsData = [
                     }
                 ]
             }
-        ],
-        votes: { likes: 89, dislikes: 34 },
-        comments: [
-            { id: 3, userName: "User ghi789...", text: "Gentler than antibiotics but took longer to see results. Worth the patience!", timestamp: new Date('2024-07-28') },
-            { id: 4, userName: "User jkl012...", text: "The oregano oil was hard on my stomach. Had to reduce the dose.", timestamp: new Date('2024-08-01') }
         ]
     },
     {
@@ -157,11 +221,6 @@ const siboMethodsData = [
                     { title: "Prokinetics and Gut Support", description: "Implementing prokinetics and other gut-healing strategies is essential to prevent a recurrence." }
                 ]
             }
-        ],
-        votes: { likes: 156, dislikes: 67 },
-        comments: [
-            { id: 5, userName: "User mno345...", text: "Incredibly difficult but the most effective treatment I've tried. 80% symptom reduction.", timestamp: new Date('2024-08-10') },
-            { id: 6, userName: "User pqr678...", text: "Made it 10 days before I couldn't handle it anymore. Still saw some improvement.", timestamp: new Date('2024-07-15') }
         ]
     },
     {
@@ -202,15 +261,163 @@ const siboMethodsData = [
                     { title: "Long-Term Motility", description: "Continue long-term prescription motility support (e.g., Motegrity, Amitiza) as needed for underlying slow transit." }
                 ]
             }
-        ],
-        votes: { likes: 45, dislikes: 18 },
-        comments: [
-            { id: 7, userName: "User stu901...", text: "Interesting approach. Helped with brain fog more than GI symptoms for me.", timestamp: new Date('2024-08-05') }
         ]
-    }
+    },
+    {
+        id: 4,
+        title: "Probiotic and Prokinetic Protocol",
+        summary: "Emphasizes the combination of a specific probiotic with a prokinetic to manage symptoms and restore gut function, particularly in cases linked to post-infectious IBS.",
+        evidenceTier: 3,
+        commonSymptoms: ["Post-Infectious IBS", "Motility Issues", "Relapse Prevention"],
+        citation: {
+            text: "This protocol is based on a user's experience. While specific probiotics and prokinetics have been studied individually, this particular combination is anecdotal.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day on the Probiotic/Prokinetic Protocol",
+            schedule: [
+                { time: "Morning (with breakfast)", action: "Take one dose of the chosen probiotic (e.g., KefirLabs coconut shot)." },
+                { time: "Between Meals", action: "Maintain meal spacing of 4-5 hours with no snacking to support motility." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., 2mg prucalopride) on an empty stomach, at least 2-3 hours after the last meal." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Daily Regimen (Post-Antibiotic or Maintenance)",
+                steps: [
+                    { title: "Prerequisite", description: "This user began this protocol a couple of weeks after a course of Rifaximin. It may be considered a post-antibiotic or maintenance strategy." },
+                    { title: "Probiotic", description: "One KefirLabs brand coconut creamy probiotic shot taken daily with breakfast." },
+                    { title: "Prokinetic", description: "2mg of prucalopride taken nightly to improve gut motility." },
+                    { title: "Diet", description: "The user reported being able to return to a normal diet with minimal discomfort while on this protocol." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 7,
+        title: "Aggressive Multi-Phase Protocol",
+        summary: "An aggressive protocol for stubborn SIBO. It operates on a multi-pronged, rotational attack using the elemental diet, pharmaceuticals, and herbals to prevent microbial resistance.",
+        evidenceTier: 3,
+        commonSymptoms: ["Stubborn/Recurrent SIBO", "High Methane/Hydrogen Levels", "Biofilm-Related Issues"],
+        citation: {
+            text: "This is a community-derived protocol based on anecdotal reports. It combines several methods (Elemental, Pharmaceutical, Herbal) which have individual scientific backing (see other methods). The combined protocol itself has not been studied.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day (Example during Herbal Phase)",
+            schedule: [
+                { time: "Morning", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take first dose of herbal antimicrobials with low-FODMAP breakfast." },
+                { time: "Afternoon", action: "Low-FODMAP lunch. Ensure 4-5 hours of spacing between meals to promote MMC." },
+                { time: "Evening", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take second dose of herbals with low-FODMAP dinner." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., MotilPro) at least 2 hours after dinner." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: 'Shock and Awe' - Elemental Diet (14-21 Days)",
+                steps: [ { title: "Objective & Execution", description: "Commit to a 16-21 day course of an elemental diet formula to starve the microbes. Sip the formula slowly over an hour." } ]
+            },
+            {
+                phase: "Phase 2: The Main Offensive - Rotational Antimicrobials (8-10 weeks)",
+                steps: [
+                    { title: "Round 1 - Pharmaceutical (4 weeks)", description: "Use Rifaximin (Xifaxan), often paired with Neomycin or Metronidazole for methane. Enhance with Partially Hydrolyzed Guar Gum (PHGG)." },
+                    { title: "Round 2 - Herbal (4-6 weeks)", description: "Switch to a broad-spectrum herbal combination like Candibactin-AR/BR or Dysbiocide/FC Cidal." }
+                ]
+            },
+            {
+                phase: "Phase 3: Breaking Down Defenses - Biofilm Disruption",
+                steps: [ { title: "Objective & Execution", description: "Take a biofilm disrupting agent (e.g., Biofilm Defense) 30-60 minutes before each dose of antibiotics or herbs to break down protective shields." } ]
+            },
+            {
+                phase: "Phase 4: Relapse Prevention & Gut Rebuilding (Long-Term)",
+                steps: [
+                    { title: "Prokinetics", description: "Essential for stimulating the MMC. Options include prescription (Motegrity) or herbal (MotilPro, Iberogast)." },
+                    { title: "Dietary Strategy", description: "Meal spacing is crucial (4-5 hours between meals, 12+ hour overnight fast). Start with a SIBO Specific or Low FODMAP diet." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 5,
+        title: "Intestinal Transit & Motility Protocol",
+        summary: "Centers on the core belief that SIBO is fundamentally a problem of slow intestinal transit. The primary goal is to speed up digestion and motility.",
+        evidenceTier: 3,
+        commonSymptoms: ["Chronic Constipation", "Slow Transit Time", "Bloating After Meals"],
+        citation: {
+            text: "This protocol is based on the well-established concept of the Migrating Motor Complex (MMC). While the components (like ginger & artichoke prokinetics) have some studies, this specific comprehensive protocol is anecdotal.",
+            url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3290399/"
+        },
+        sampleDay: {
+            title: "A Sample Day for Improving Motility",
+            schedule: [
+                { time: "Waking Up", action: "Drink a large glass of warm water. Practice deep breathing or vagus nerve stimulation exercises." },
+                { time: "Breakfast", action: "Take Betaine HCL with a protein-rich, low-FODMAP breakfast. Chew every bite thoroughly." },
+                { time: "Between Meals", action: "No snacking. Drink plenty of water. Go for a short walk after meals." },
+                { time: "Bedtime", action: "Take prokinetic (Ginger & Artichoke) on an empty stomach, at least 2-3 hours after your last meal." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Assessment and Monitoring",
+                steps: [
+                    { title: "Bowel Transit Time Test", description: "Perform an at-home transit test (e.g., using sesame seeds) to measure how long it takes for food to pass through your system." },
+                    { title: "Symptom & Stool Journal", description: "Keep a detailed log of foods eaten, symptoms experienced, and stool quality to identify patterns and track progress." }
+                ]
+            },
+            {
+                phase: "Phase 2: Improving Motility and Digestion",
+                steps: [
+                    { title: "Prokinetics", description: "A combination of Artichoke and Ginger Extract is taken on an empty stomach to stimulate the MMC." },
+                    { title: "Stomach Acid Support", description: "Use Betaine HCL to increase the acidity of the stomach, aiding in the initial breakdown of food." },
+                ]
+            },
+            {
+                phase: "Phase 3: Stress Management and Vagus Nerve Stimulation",
+                steps: [
+                    { title: "De-Stress Protocol", description: "A consistent routine is crucial. The user recommends daily meditation and yoga." },
+                    { title: "Vagus Nerve Stimulation", description: "Stimulating the vagus nerve is key to improving digestion. Techniques include gratitude, empathy, connecting with nature, deep breathing, singing, and yoga." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 6,
+        title: "Colon Hydrotherapy & Digestive Reset",
+        summary: "Posits that the root cause can be old fecal deposits. The core of the treatment is to physically clean the colon while rebuilding healthy digestive habits.",
+        evidenceTier: 0,
+        commonSymptoms: ["Severe Constipation", "Feeling of 'Fullness' or Blockage", "Systemic Issues"],
+        citation: {
+            text: "There is no peer-reviewed evidence to support colon hydrotherapy as a treatment for SIBO. Major medical institutions like the Mayo Clinic advise that it is unnecessary and carries potential risks.",
+            url: "https://www.mayoclinic.org/healthy-lifestyle/consumer-health/expert-answers/colon-cleansing/faq-20058435"
+        },
+        sampleDay: {
+            title: "A Sample Day for Digestive Reset",
+            schedule: [
+                { time: "Morning", action: "Start the day with 2-3 large glasses of filtered water. Take Betaine HCL with a well-chewed, simple breakfast." },
+                { time: "Throughout Day", action: "Focus on hydration, aiming for 2-3 liters of water. Avoid snacking. Eat slowly and mindfully." },
+                { time: "Evening", action: "Take TUDCA or Ox Bile with dinner if fats are difficult to digest. Practice relaxation techniques before bed." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: The 'Clean Out' (Use with Caution)",
+                steps: [
+                    { title: "Colon Hydrotherapy", description: "This user reported success with 3 sessions. This therapy is not supported by scientific evidence for SIBO and should be discussed with a medical professional due to potential risks." }
+                ]
+            },
+            {
+                phase: "Phase 2: Rebuilding the Digestive Cascade (Ongoing Habits)",
+                steps: [
+                    { title: "Mindful Eating", description: "Chew food ~30 times per bite. Eat slowly and without stress or distractions." },
+                    { title: "Stomach Acid & Bile Support", description: "Use Betaine HCL for stomach acid. Use TUDCA or Ox Bile for bile flow. Quit alcohol and junk food." },
+                    { title: "Hydration", description: "Drink 2-3 Liters of filtered water daily." },
+                ]
+            },
+        ]
+    },
 ];
 
-// Helper Components
+// ---------------- Helper Components ----------------
 const ThumbsUpIcon = ({ isSelected }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z" />
@@ -294,22 +501,12 @@ const AiPatternAnalysis = () => {
     );
 };
 
-// Header Component
+// ---------------- Header (Auth) ----------------
 const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     const handleLogin = () => {
-        // Mock login - in real app this would use Firebase auth
-        const mockUser = {
-            uid: 'user_' + Date.now(),
-            email: 'anonymous@example.com'
-        };
-        // This would be handled by parent component state
-        alert('In the real app, this would sign you in anonymously through Firebase!');
+        if (auth) signInAnonymously(auth).catch((e) => console.error('Anonymous sign-in failed:', e));
     };
-
-    const handleLogout = () => {
-        alert('In the real app, this would sign you out!');
-    };
-
+    
     return (
         <header className="flex items-center justify-between bg-white p-4 shadow-sm">
             <button onClick={onGoHome} className="text-xl font-bold text-gray-800">
@@ -327,7 +524,7 @@ const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
                         <span className="hidden text-sm text-gray-600 sm:inline">
                             Welcome, User {user.uid.substring(0, 6)}...
                         </span>
-                        <button onClick={handleLogout} className="font-semibold text-red-600 hover:text-red-800">
+                        <button onClick={() => auth && signOut(auth)} className="font-semibold text-red-600 hover:text-red-800">
                             Log Out
                         </button>
                     </div>
@@ -341,8 +538,8 @@ const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
     );
 };
 
-// Method Card Component
-const MethodCard = ({ method, onSelect, onVote, userVote }) => (
+// ---------------- Main UI ----------------
+const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
     <div
         className="flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-transform hover:-translate-y-1"
         onClick={() => onSelect(method.id)}
@@ -365,7 +562,7 @@ const MethodCard = ({ method, onSelect, onVote, userVote }) => (
                 }`}
             >
                 <ThumbsUpIcon isSelected={userVote === 'like'} />
-                <span className="font-semibold">{method.votes.likes}</span>
+                <span className="font-semibold">{votes.likes}</span>
             </button>
             <button
                 onClick={(e) => {
@@ -377,14 +574,13 @@ const MethodCard = ({ method, onSelect, onVote, userVote }) => (
                 }`}
             >
                 <ThumbsDownIcon isSelected={userVote === 'dislike'} />
-                <span className="font-semibold">{method.votes.dislikes}</span>
+                <span className="font-semibold">{votes.dislikes}</span>
             </button>
         </div>
     </div>
 );
 
-// Method List Page
-const MethodListPage = ({ methods, onSelectMethod, onVote, userVotes, onSortChange, onOpenAdvisor }) => (
+const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange, onOpenAdvisor }) => (
     <div className="p-4 sm:p-6 md:p-8">
         <header className="mb-10 text-center">
             <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
@@ -398,7 +594,7 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, userVotes, onSortChan
                 onClick={onOpenAdvisor}
                 className="mt-6 transform rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-xl"
             >
-                ✨ Get Help from AI Protocol Advisor
+                Get Help from AI Protocol Advisor
             </button>
         </header>
 
@@ -419,9 +615,10 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, userVotes, onSortChan
                     method={method}
                     onSelect={onSelectMethod}
                     onVote={onVote}
+                    votes={votes[method.id] || { likes: 0, dislikes: 0 }}
                     userVote={userVotes[method.id] || null}
-                />
-            ))}
+                />)
+            )}
         </div>
 
         <AiPatternAnalysis />
@@ -436,7 +633,6 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, userVotes, onSortChan
     </div>
 );
 
-// Method Detail Page
 const MethodDetailPage = ({ method, onBack, user }) => (
     <div className="mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
         <button
@@ -527,39 +723,44 @@ const MethodDetailPage = ({ method, onBack, user }) => (
     </div>
 );
 
-// Comments Section
+// ---------------- Comments ----------------
 const CommentsSection = ({ methodId, user }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Mock loading comments for the specific method
-        const method = siboMethodsData.find(m => m.id === methodId);
-        if (method) {
-            setComments(method.comments || []);
-        }
+        if (!db) return;
+        const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
+        const unsubscribe = onSnapshot(
+            commentsQuery,
+            (snapshot) => {
+                const fetched = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+                setComments(fetched);
+            },
+            (err) => {
+                console.error('Error fetching comments:', err);
+                setError('Could not load comments. Please try again later.');
+            }
+        );
+        return () => unsubscribe();
     }, [methodId]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!newComment.trim() || !user) return;
-
-        const comment = {
-            id: Date.now(),
-            userName: `User ${user.uid.substring(0, 6)}...`,
-            text: newComment,
-            timestamp: new Date()
-        };
-
-        setComments(prev => [comment, ...prev]);
-        setNewComment('');
-        
-        // In real app, this would save to Firebase
-        alert('Comment posted! (In the real app, this would save to Firebase)');
-    };
-
-    const handleLogin = () => {
-        alert('In the real app, this would sign you in anonymously!');
+        if (!newComment.trim() || !user || !db) return;
+        try {
+            await addDoc(collection(db, `methods/${methodId}/comments`), {
+                text: newComment,
+                userName: `User ${user.uid.substring(0, 6)}...`,
+                userId: user.uid,
+                timestamp: serverTimestamp(),
+            });
+            setNewComment('');
+        } catch (err) {
+            console.error('Error posting comment:', err);
+            setError('Failed to post comment.');
+        }
     };
 
     return (
@@ -587,21 +788,21 @@ const CommentsSection = ({ methodId, user }) => {
                     <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-4 text-center">
                         <p className="text-gray-600">
                             Want to share your experience?{' '}
-                            <button onClick={handleLogin} className="font-semibold text-blue-600 hover:underline">
+                            <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">
                                 Sign in
                             </button>{' '}
                             to join the discussion.
                         </p>
                     </div>
                 )}
-                
+                {error && <p className="mb-4 text-red-500">{error}</p>}
                 <div className="space-y-6">
                     {comments.length > 0 ? (
                         comments.map((c) => (
                             <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
                                 <p className="font-semibold text-gray-800">{c.userName}</p>
                                 <p className="mb-2 text-xs text-gray-500">
-                                    {c.timestamp.toLocaleString()}
+                                    {c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
                                 </p>
                                 <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
                             </div>
@@ -615,35 +816,31 @@ const CommentsSection = ({ methodId, user }) => {
     );
 };
 
-// Submit Method Page
+// ---------------- Submit Method ----------------
 const SubmitMethodPage = ({ onBack, user }) => {
-    const [formData, setFormData] = useState({ 
-        title: '', 
-        summary: '', 
-        sourceLink: '', 
-        symptoms: '', 
-        protocol: '', 
-        sampleDay: '' 
-    });
+    const [formData, setFormData] = useState({ title: '', summary: '', sourceLink: '', symptoms: '', protocol: '', sampleDay: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!user) return;
-        
+        if (!user || !db) return;
         setIsSubmitting(true);
-        // Mock submission
-        setTimeout(() => {
-            alert('Thank you for your submission! It will be reviewed shortly. (In the real app, this would save to Firebase)');
-            setIsSubmitting(false);
+        try {
+            await addDoc(collection(db, 'submissions'), {
+                ...formData,
+                submittedBy: user.uid,
+                submittedAt: serverTimestamp(),
+            });
+            alert('Thank you for your submission! It will be reviewed shortly.');
             onBack();
-        }, 1500);
-    };
-
-    const handleLogin = () => {
-        alert('In the real app, this would sign you in anonymously!');
+        } catch (error) {
+            console.error('Error submitting form: ', error);
+            alert('Sorry, there was an error submitting your form. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!user) {
@@ -652,7 +849,7 @@ const SubmitMethodPage = ({ onBack, user }) => {
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit a Method</h1>
                 <p className="mb-8 text-lg text-gray-600">
                     Please{' '}
-                    <button onClick={handleLogin} className="font-semibold text-blue-600 hover:underline">
+                    <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">
                         sign in
                     </button>{' '}
                     to submit a new method. This helps us keep the submissions genuine.
@@ -672,102 +869,38 @@ const SubmitMethodPage = ({ onBack, user }) => {
                 </svg>
                 Back to All Methods
             </button>
-            
             <h1 className="mb-6 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit a New Recovery Method</h1>
             <p className="mb-8 text-gray-600">
-                Thank you for contributing to the community! Please provide as much detail as possible. Your submission will be reviewed before being published.
+                Thank you for contributing to the community! Please provide as much detail as possible. Your submission will be reviewed before being
+                published.
             </p>
-            
             <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border border-gray-200 bg-white p-8 shadow-md">
                 <div>
                     <label htmlFor="title" className="block text-sm font-medium text-gray-700">Method Title</label>
-                    <input 
-                        type="text" 
-                        name="title" 
-                        id="title" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="e.g., Low-Dose Naltrexone (LDN) Protocol" 
-                        value={formData.title} 
-                        onChange={handleChange} 
-                    />
+                    <input type="text" name="title" id="title" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Low-Dose Naltrexone (LDN) Protocol" value={formData.title} onChange={handleChange} />
                 </div>
-                
                 <div>
                     <label htmlFor="summary" className="block text-sm font-medium text-gray-700">Short Summary</label>
-                    <textarea 
-                        name="summary" 
-                        id="summary" 
-                        rows="3" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="Briefly describe the method and its main principle." 
-                        value={formData.summary} 
-                        onChange={handleChange} 
-                    />
+                    <textarea name="summary" id="summary" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Briefly describe the method and its main principle." value={formData.summary} onChange={handleChange} />
                 </div>
-                
                 <div>
                     <label htmlFor="sourceLink" className="block text-sm font-medium text-gray-700">Link to Source (Optional)</label>
-                    <input 
-                        type="url" 
-                        name="sourceLink" 
-                        id="sourceLink" 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="e.g., Reddit post, blog, or article URL" 
-                        value={formData.sourceLink} 
-                        onChange={handleChange} 
-                    />
+                    <input type="url" name="sourceLink" id="sourceLink" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Reddit post, blog, or article URL" value={formData.sourceLink} onChange={handleChange} />
                 </div>
-                
                 <div>
                     <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700">What symptoms is this method best for?</label>
-                    <textarea 
-                        name="symptoms" 
-                        id="symptoms" 
-                        rows="3" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="e.g., Methane-dominant SIBO, Chronic Constipation, Brain Fog" 
-                        value={formData.symptoms} 
-                        onChange={handleChange} 
-                    />
+                    <textarea name="symptoms" id="symptoms" rows="3" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., Methane-dominant SIBO, Chronic Constipation, Brain Fog" value={formData.symptoms} onChange={handleChange} />
                 </div>
-                
                 <div>
                     <label htmlFor="protocol" className="block text-sm font-medium text-gray-700">Full Protocol Details</label>
-                    <textarea 
-                        name="protocol" 
-                        id="protocol" 
-                        rows="8" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="Describe the phases and steps in detail. Include dosages, timing, and duration." 
-                        value={formData.protocol} 
-                        onChange={handleChange} 
-                    />
+                    <textarea name="protocol" id="protocol" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe the phases and steps in detail. Include dosages, timing, and duration." value={formData.protocol} onChange={handleChange} />
                 </div>
-                
                 <div>
                     <label htmlFor="sampleDay" className="block text-sm font-medium text-gray-700">A Sample Day</label>
-                    <textarea 
-                        name="sampleDay" 
-                        id="sampleDay" 
-                        rows="5" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="Describe a typical day following this protocol from morning to night." 
-                        value={formData.sampleDay} 
-                        onChange={handleChange} 
-                    />
+                    <textarea name="sampleDay" id="sampleDay" rows="5" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Describe a typical day following this protocol from morning to night." value={formData.sampleDay} onChange={handleChange} />
                 </div>
-                
                 <div>
-                    <button 
-                        type="submit" 
-                        disabled={isSubmitting} 
-                        className="w-full justify-center rounded-md bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-400"
-                    >
+                    <button type="submit" disabled={isSubmitting} className="w-full justify-center rounded-md bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-400">
                         {isSubmitting ? 'Submitting...' : 'Submit for Review'}
                     </button>
                 </div>
@@ -776,25 +909,29 @@ const SubmitMethodPage = ({ onBack, user }) => {
     );
 };
 
-// Feedback Page
+// ---------------- Feedback ----------------
 const FeedbackPage = ({ onBack, user }) => {
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!feedback.trim() || !user) return;
-        
+        if (!feedback.trim() || !user || !db) return;
         setIsSubmitting(true);
-        setTimeout(() => {
-            alert('Thank you for your feedback! (In the real app, this would save to Firebase)');
-            setIsSubmitting(false);
+        try {
+            await addDoc(collection(db, 'feedback'), {
+                feedbackText: feedback,
+                submittedBy: user.uid,
+                submittedAt: serverTimestamp(),
+            });
+            alert('Thank you for your feedback!');
             onBack();
-        }, 1500);
-    };
-
-    const handleLogin = () => {
-        alert('In the real app, this would sign you in anonymously!');
+        } catch (error) {
+            console.error('Error submitting feedback: ', error);
+            alert('Sorry, there was an error submitting your feedback. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (!user) {
@@ -803,7 +940,7 @@ const FeedbackPage = ({ onBack, user }) => {
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit Feedback</h1>
                 <p className="mb-8 text-lg text-gray-600">
                     Please{' '}
-                    <button onClick={handleLogin} className="font-semibold text-blue-600 hover:underline">
+                    <button onClick={() => auth && signInAnonymously(auth)} className="font-semibold text-blue-600 hover:underline">
                         sign in
                     </button>{' '}
                     to submit feedback.
@@ -823,35 +960,20 @@ const FeedbackPage = ({ onBack, user }) => {
                 </svg>
                 Back to All Methods
             </button>
-            
             <h1 className="mb-6 text-3xl font-extrabold text-gray-900 sm:text-4xl">Share Your Feedback</h1>
             <p className="mb-8 text-gray-600">
-                Have an idea to improve the site? Found a bug? Let us know! Your feedback is invaluable in making this a better resource for the community.
+                Have an idea to improve the site? Found a bug? Let us know! Your feedback is invaluable in making this a better resource for the
+                community.
             </p>
-            
             <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border border-gray-200 bg-white p-8 shadow-md">
                 <div>
                     <label htmlFor="feedback" className="block text-sm font-medium text-gray-700">
                         Your Feedback
                     </label>
-                    <textarea 
-                        name="feedback" 
-                        id="feedback" 
-                        rows="8" 
-                        required 
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                        placeholder="Tell us what you think..." 
-                        value={feedback} 
-                        onChange={(e) => setFeedback(e.target.value)} 
-                    />
+                    <textarea name="feedback" id="feedback" rows="8" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Tell us what you think..." value={feedback} onChange={(e) => setFeedback(e.target.value)} />
                 </div>
-                
                 <div>
-                    <button 
-                        type="submit" 
-                        disabled={isSubmitting} 
-                        className="w-full justify-center rounded-md bg-purple-600 py-2 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:bg-gray-400"
-                    >
+                    <button type="submit" disabled={isSubmitting} className="w-full justify-center rounded-md bg-purple-600 py-2 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:bg-gray-400">
                         {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                     </button>
                 </div>
@@ -860,7 +982,7 @@ const FeedbackPage = ({ onBack, user }) => {
     );
 };
 
-// Gemini Advisor Component
+// ---------------- Gemini Advisor ----------------
 const GeminiAdvisor = ({ methods, onClose }) => {
     const allSymptoms = [...new Set(methods.flatMap((m) => m.commonSymptoms))];
     const [selectedSymptoms, setSelectedSymptoms] = useState([]);
@@ -869,46 +991,45 @@ const GeminiAdvisor = ({ methods, onClose }) => {
 
     const toggleSymptom = (sym) => setSelectedSymptoms((prev) => (prev.includes(sym) ? prev.filter((s) => s !== sym) : [...prev, sym]));
 
-    const getAdvice = () => {
+    const getAdvice = async () => {
         if (selectedSymptoms.length === 0) {
             setAdvice('Please select at least one symptom to get advice.');
             return;
         }
-        
         setIsLoading(true);
         setAdvice('');
 
-        // Mock AI advice generation
-        setTimeout(() => {
-            const relevantMethods = methods.filter(m => 
-                m.commonSymptoms.some(symptom => 
-                    selectedSymptoms.some(selected => 
-                        symptom.toLowerCase().includes(selected.toLowerCase()) ||
-                        selected.toLowerCase().includes(symptom.toLowerCase())
-                    )
-                )
-            );
+        const simplified = methods.map((m) => ({ title: m.title, summary: m.summary, evidenceTier: m.evidenceTier, commonSymptoms: m.commonSymptoms }));
 
-            let mockAdvice = "This is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment.\n\n";
-            
-            if (relevantMethods.length > 0) {
-                mockAdvice += `Based on your selected symptoms (${selectedSymptoms.join(', ')}), here are the most relevant protocols to research and discuss with your doctor:\n\n`;
-                
-                relevantMethods.slice(0, 3).forEach((method, index) => {
-                    const tierText = method.evidenceTier === 1 ? "strong scientific evidence" : 
-                                   method.evidenceTier === 2 ? "promising evidence" : 
-                                   "anecdotal reports";
-                    mockAdvice += `${index + 1}. **${method.title}** (${tierText}): ${method.summary}\n\n`;
-                });
-                
-                mockAdvice += "Remember, SIBO treatment often requires a two-phase approach: an initial eradication phase followed by prevention measures to avoid recurrence. Motility support and addressing underlying causes are crucial for long-term success.";
-            } else {
-                mockAdvice += "I couldn't find protocols specifically matching your symptoms. Please consult with a healthcare provider for personalized guidance.";
-            }
-            
-            setAdvice(mockAdvice);
+        const systemPrompt = `You are an AI assistant for a SIBO recovery website. Your role is to provide a helpful, non-medical summary based on user-reported symptoms and a list of community-sourced treatment protocols.\n\nIMPORTANT RULES:\n1. DO NOT PROVIDE MEDICAL ADVICE. Start every single response with this exact disclaimer: "This is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment."\n2. Analyze the user's selected symptoms and the provided list of protocols.\n3. Identify which protocols are most relevant to the user's symptoms based on the 'commonSymptoms' listed for each protocol.\n4. Summarize in 2-3 short paragraphs.\n5. Mention the 'evidenceTier'.\n6. Helpful, empathetic, strictly informational.\n7. Do not invent information or suggest protocols not on the list.`;
+
+        const userQuery = `My primary symptoms are: ${selectedSymptoms.join(', ')}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?\n\nProtocols Data:\n${JSON.stringify(simplified, null, 2)}`;
+
+        if (!GEMINI_API_KEY) {
+            setAdvice('Gemini API key is not configured. Set REACT_APP_GEMINI_API_KEY, VITE_GEMINI_API_KEY, or GEMINI_API_KEY in your environment variables.');
             setIsLoading(false);
-        }, 2000);
+            return;
+        }
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+                    contents: [{ role: 'user', parts: [{ text: userQuery }] }],
+                }),
+            });
+            if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+            const result = await response.json();
+            const text = result?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('\n');
+            setAdvice(text || "Sorry, I couldn't generate advice at this time.");
+        } catch (err) {
+            console.error('Gemini API call failed:', err);
+            setAdvice('Sorry, there was an error getting advice from the AI. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -961,128 +1082,197 @@ const GeminiAdvisor = ({ methods, onClose }) => {
     );
 };
 
-// Main App Component
+// ---------------- App ----------------
 export default function App() {
     const [currentPage, setCurrentPage] = useState('list');
     const [selectedMethodId, setSelectedMethodId] = useState(null);
+    const [votes, setVotes] = useState({});
     const [userVotes, setUserVotes] = useState({});
     const [user, setUser] = useState(null);
+    const [authReady, setAuthReady] = useState(false);
     const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
-    const [sortOrder, setSortOrder] = useState('evidence');
+    const [sortOrder, setSortOrder] = useState('evidence'); // 'evidence' | 'likes'
 
-    // Mock user login
-    const handleLogin = () => {
-        const mockUser = { uid: 'user_' + Date.now() };
-        setUser(mockUser);
-    };
+    // Auth
+    useEffect(() => {
+        if (!auth) {
+            setAuthReady(true);
+            return;
+        }
+        const unsub = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+            } else {
+                try {
+                    // In dev canvas, a token may be provided for auto-login
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        // On live site or otherwise, sign in anonymously
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.error('Auth sign-in failed.', e);
+                }
+            }
+            setAuthReady(true);
+        });
+        return () => unsub();
+    }, []);
 
-    const handleLogout = () => {
-        setUser(null);
+    // Aggregate votes (per method id)
+    useEffect(() => {
+        if (!db) return;
+        const votesCollection = collection(db, 'votes');
+        const unsub = onSnapshot(votesCollection, (snapshot) => {
+            const data = {};
+            siboMethodsData.forEach((m) => (data[String(m.id)] = { likes: 0, dislikes: 0 }));
+            snapshot.forEach((d) => {
+                data[d.id] = d.data();
+            });
+            setVotes(data);
+        });
+        return () => unsub();
+    }, []);
+
+    // Current user's votes
+    useEffect(() => {
+        if (user && db) {
+            const userVotesCollection = collection(db, `users/${user.uid}/userVotes`);
+            const unsub = onSnapshot(userVotesCollection, (snapshot) => {
+                const mine = {};
+                snapshot.forEach((d) => {
+                    mine[d.id] = d.data().vote;
+                });
+                setUserVotes(mine);
+            });
+            return () => unsub();
+        }
         setUserVotes({});
-    };
+    }, [user]);
 
     const handleSelectMethod = (id) => {
         setSelectedMethodId(id);
         setCurrentPage('detail');
     };
-
     const handleBack = () => {
         setSelectedMethodId(null);
         setCurrentPage('list');
     };
-
     const handleGoHome = () => handleBack();
     const handleSubmitMethod = () => setCurrentPage('submit');
     const handleFeedback = () => setCurrentPage('feedback');
 
-    const handleVote = (methodId, voteType) => {
-        if (!user) {
-            handleLogin();
-            return;
+    // Voting with transaction that reads the user's previous vote atomically
+    const handleVote = async (id, voteType) => {
+        if (!auth || !db) return;
+        let currentUser = auth.currentUser;
+        if (!currentUser) {
+            try {
+                currentUser = (await signInAnonymously(auth)).user;
+            } catch (e) {
+                console.error('Sign-in for vote failed', e);
+                return;
+            }
         }
 
-        const currentVote = userVotes[methodId];
-        let newVote = null;
+        const methodId = String(id);
+        const voteDocRef = doc(db, 'votes', methodId);
+        const userVoteDocRef = doc(db, `users/${currentUser.uid}/userVotes`, methodId);
 
-        if (currentVote !== voteType) {
-            newVote = voteType;
-        }
+        try {
+            await runTransaction(db, async (tx) => {
+                const [voteDocSnap, userVoteSnap] = await Promise.all([
+                    tx.get(voteDocRef),
+                    tx.get(userVoteDocRef),
+                ]);
 
-        setUserVotes(prev => ({
-            ...prev,
-            [methodId]: newVote
-        }));
+                let likes = voteDocSnap.exists() ? voteDocSnap.data().likes || 0 : 0;
+                let dislikes = voteDocSnap.exists() ? voteDocSnap.data().dislikes || 0 : 0;
 
-        // Update the method's vote counts in the data
-        const methodIndex = siboMethodsData.findIndex(m => m.id === methodId);
-        if (methodIndex !== -1) {
-            // Remove previous vote impact
-            if (currentVote === 'like') {
-                siboMethodsData[methodIndex].votes.likes = Math.max(0, siboMethodsData[methodIndex].votes.likes - 1);
-            } else if (currentVote === 'dislike') {
-                siboMethodsData[methodIndex].votes.dislikes = Math.max(0, siboMethodsData[methodIndex].votes.dislikes - 1);
-            }
+                const prev = userVoteSnap.exists() ? userVoteSnap.data().vote : null;
 
-            // Apply new vote
-            if (newVote === 'like') {
-                siboMethodsData[methodIndex].votes.likes += 1;
-            } else if (newVote === 'dislike') {
-                siboMethodsData[methodIndex].votes.dislikes += 1;
-            }
+                // Remove previous vote's impact
+                if (prev === 'like') likes = Math.max(0, likes - 1);
+                if (prev === 'dislike') dislikes = Math.max(0, dislikes - 1);
+
+                // Apply new vote (if not toggling off)
+                if (voteType !== prev) {
+                    if (voteType === 'like') likes++;
+                    if (voteType === 'dislike') dislikes++;
+                    tx.set(userVoteDocRef, { vote: voteType });
+                } else {
+                    tx.delete(userVoteDocRef); // Toggled off
+                }
+                
+                // Update aggregate count
+                tx.set(voteDocRef, { likes, dislikes }, { merge: true });
+            });
+        } catch (e) {
+            console.error('Transaction failed: ', e);
         }
     };
     
     // Sort methods based on user selection
     const sortedMethods = [...siboMethodsData].sort((a, b) => {
         if (sortOrder === 'likes') {
-            return b.votes.likes - a.votes.likes;
+            const likesA = votes[a.id]?.likes || 0;
+            const likesB = votes[b.id]?.likes || 0;
+            return likesB - likesA;
         }
-        // Evidence tier sort: high tiers first, but tier 0 (caution) last
+        // Custom sort for evidence tier: high tiers first, but tier 0 (caution) last
         const tierA = a.evidenceTier === 0 ? -1 : a.evidenceTier;
         const tierB = b.evidenceTier === 0 ? -1 : b.evidenceTier;
         return tierB - tierA;
     });
 
     const selectedMethod = siboMethodsData.find((m) => m.id === selectedMethodId);
-
+    
+    // Render loading state or error for bad config
+    if (!isFirebaseConfigValid()) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
+                <div className="rounded-lg bg-white p-10 text-center shadow-md">
+                    <h1 className="mb-4 text-2xl font-bold text-red-600">Configuration Error</h1>
+                    <p className="text-gray-700">
+                        Firebase configuration is missing. If you're the site owner, ensure environment variables are set in your hosting provider.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+    if (!authReady) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                <p className="text-gray-600">Loading Community Hub...</p>
+            </div>
+        );
+    }
+    
     // Page router
     const renderPage = () => {
         switch (currentPage) {
-            case 'detail': 
-                return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
-            case 'submit': 
-                return <SubmitMethodPage onBack={handleBack} user={user} />;
-            case 'feedback': 
-                return <FeedbackPage onBack={handleBack} user={user} />;
+            case 'detail': return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
+            case 'submit': return <SubmitMethodPage onBack={handleBack} user={user} />;
+            case 'feedback': return <FeedbackPage onBack={handleBack} user={user} />;
             case 'list':
             default:
-                return (
-                    <MethodListPage 
-                        methods={sortedMethods} 
-                        onSelectMethod={handleSelectMethod}
-                        onVote={handleVote}
-                        userVotes={userVotes}
-                        onSortChange={setSortOrder}
-                        onOpenAdvisor={() => setIsAdvisorOpen(true)}
-                    />
-                );
+                return <MethodListPage 
+                    methods={sortedMethods} 
+                    onSelectMethod={handleSelectMethod}
+                    onVote={handleVote}
+                    votes={votes}
+                    userVotes={userVotes}
+                    onSortChange={setSortOrder}
+                    onOpenAdvisor={() => setIsAdvisorOpen(true)}
+                />;
         }
     };
 
     return (
         <main className="min-h-screen font-sans bg-gray-50">
-            <Header 
-                user={user} 
-                onGoHome={handleGoHome} 
-                onSubmitMethod={handleSubmitMethod} 
-                onFeedback={handleFeedback} 
-            />
-            {isAdvisorOpen && (
-                <GeminiAdvisor 
-                    methods={siboMethodsData} 
-                    onClose={() => setIsAdvisorOpen(false)} 
-                />
-            )}
+            <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} onFeedback={handleFeedback} />
+            {isAdvisorOpen && <GeminiAdvisor methods={siboMethodsData} onClose={() => setIsAdvisorOpen(false)} />}
             {renderPage()}
         </main>
     );
