@@ -466,4 +466,11 @@ const EvidenceTierExplanation = () => {
                         </div>
                         <div>
                             <h4 className="font-semibold text-gray-700">{tierItem.title}</h4>
-                            <p className="text-gray-600 text-sm">{tierItem.description
+                            <p className="text-gray-600 text-sm">{tierItem.description}</p>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
