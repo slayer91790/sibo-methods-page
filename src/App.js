@@ -1,6 +1,13 @@
 /* global __firebase_config */
 import React, { useState, useEffect } from 'react';
-// --- Firebase SDKs ---
+
+/**
+ * SIBO Recovery Hub — single-file React SPA
+ * This version uses a hybrid configuration loader to work in both
+ * the development canvas and on a live Netlify site.
+ */
+
+// Import all Firebase functions we'll need
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
@@ -19,12 +26,6 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore';
-
-/**
- * SIBO Recovery Hub — single-file React SPA
- * This version uses a hybrid configuration loader to work in both
- * the development canvas and on a live Netlify site.
- */
 
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
@@ -60,9 +61,18 @@ const isFirebaseConfigValid = () => {
 }
 
 // Initialize Firebase only if config present
-let app;
-let db;
-let auth;
+let app = null;
+let db = null;
+let auth = null;
+
+if (isFirebaseConfigValid()) {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  console.log('Firebase initialized successfully', app);
+} else {
+  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
+}
 // ---------------- Data for SIBO Methods ----------------
 const siboMethodsData = [
     {
