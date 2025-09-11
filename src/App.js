@@ -14,6 +14,8 @@ import {
   onAuthStateChanged,
   signInAnonymously,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -527,8 +529,20 @@ const AudioSection = () => {
 
 // ---------------- Header (Auth) ----------------
 const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
-    const handleLogin = () => {
-        if (auth) signInAnonymously(auth).catch((e) => console.error('Anonymous sign-in failed:', e));
+    const handleLogin = async () => {
+        if (!auth) return;
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error('Google sign-in failed:', error);
+            // If Google fails, try anonymous sign-in as backup
+            try {
+                await signInAnonymously(auth);
+            } catch (anonError) {
+                console.error('Fallback anonymous sign-in also failed:', anonError);
+            }
+        }
     };
     
     return (
@@ -546,7 +560,7 @@ const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
                 {user ? (
                     <div className="flex items-center space-x-4">
                         <span className="hidden text-sm text-gray-600 sm:inline">
-                            Welcome, User {user.uid.substring(0, 6)}...
+                            Welcome, {user.displayName || `User ${user.uid.substring(0, 6)}...`}
                         </span>
                         <button onClick={() => auth && signOut(auth)} className="font-semibold text-red-600 hover:text-red-800">
                             Log Out
@@ -554,7 +568,7 @@ const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
                     </div>
                 ) : (
                     <button onClick={handleLogin} className="font-semibold text-blue-600 hover:text-blue-800">
-                        Sign In to Vote & Comment
+                        Sign In with Google
                     </button>
                 )}
             </div>
