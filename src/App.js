@@ -1,4 +1,4 @@
-/* global __initial_auth_token, __firebase_config */
+/* global __firebase_config */
 import React, { useState, useEffect } from 'react';
 // --- Firebase SDKs ---
 import { initializeApp } from 'firebase/app';
@@ -7,7 +7,6 @@ import {
   onAuthStateChanged,
   signInAnonymously,
   signOut,
-  signInWithCustomToken,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -26,16 +25,6 @@ import {
  * This version uses a hybrid configuration loader to work in both
  * the development canvas and on a live Netlify site.
  */
-
-// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
-const readEnv = (...keys) => {
-  const win = typeof window !== 'undefined' ? window : {};
-  for (const k of keys) {
-    if (typeof process !== 'undefined' && process.env?.[k]) return process.env[k];
-    if (win.ENV?.[k]) return win.ENV[k];
-  }
-  return '';
-};
 
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
@@ -67,6 +56,22 @@ const isFirebaseConfigValid = () => {
     });
     
     // This function now correctly checks for missing or truly empty values.
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
+}
+
+// Initialize Firebase only if config present
+let app;
+let db;
+let auth;
+if (isFirebaseConfigValid()) {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+} else {
+  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
+}
+
+// Rest of your code remains exactly the same from here...
     return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
 }
 
