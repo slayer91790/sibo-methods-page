@@ -1,15 +1,21 @@
-/* global __initial_auth_token, __firebase_config */
+/* global __firebase_config */
 import React, { useState, useEffect } from 'react';
-// --- Firebase SDKs ---
+
+/**
+ * SIBO Recovery Hub — single-file React SPA
+ * This version uses a hybrid configuration loader to work in both
+ * the development canvas and on a live Netlify site.
+ */
+
+// Import all Firebase functions we'll need
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   onAuthStateChanged,
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut,
   signInAnonymously,
-  signInWithCustomToken,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -23,22 +29,6 @@ import {
   orderBy,
 } from 'firebase/firestore';
 
-/**
- * SIBO Recovery Hub — single-file React SPA
- * This version uses a hybrid configuration loader to work in both
- * the development canvas and on a live Netlify site.
- */
-
-// ---------------- Env helpers (CRA or window.ENV on Netlify) ----------------
-const readEnv = (...keys) => {
-  const win = typeof window !== 'undefined' ? window : {};
-  for (const k of keys) {
-    if (typeof process !== 'undefined' && process.env?.[k]) return process.env[k];
-    if (win.ENV?.[k]) return win.ENV[k];
-  }
-  return '';
-};
-
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -47,33 +37,41 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
 } else {
     // For production, read directly from process.env at build time
     firebaseConfig = {
-      apiKey: readEnv('REACT_APP_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
-      authDomain: readEnv('REACT_APP_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
-      projectId: readEnv('REACT_APP_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
-      storageBucket: readEnv('REACT_APP_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
-      messagingSenderId: readEnv('REACT_APP_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
-      appId: readEnv('REACT_APP_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID,
     };
 }
 
-
-const GEMINI_API_KEY = readEnv('REACT_APP_GEMINI_API_KEY', 'GEMINI_API_KEY');
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
 // Helper to verify config
 const isFirebaseConfigValid = () => {
-    return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
+    // Debug logging to see what we're getting
+    console.log('Firebase config check:', {
+        apiKey: firebaseConfig?.apiKey ? 'present' : 'missing',
+        authDomain: firebaseConfig?.authDomain ? 'present' : 'missing',
+        projectId: firebaseConfig?.projectId ? 'present' : 'missing',
+        config: firebaseConfig
+    });
+    
+    // This function now correctly checks for missing or truly empty values.
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
 }
 
 // Initialize Firebase only if config present
-let app;
-let db;
-let auth;
-let googleProvider;
+let app = null;
+let db = null;
+let auth = null;
+
 if (isFirebaseConfigValid()) {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   auth = getAuth(app);
-  googleProvider = new GoogleAuthProvider();
+  console.log('Firebase initialized successfully', app);
 } else {
   console.error('Firebase configuration is missing or incomplete. Check environment variables.');
 }
@@ -468,133 +466,4 @@ const EvidenceTierExplanation = () => {
                         </div>
                         <div>
                             <h4 className="font-semibold text-gray-700">{tierItem.title}</h4>
-                            <p className="text-gray-600 text-sm">{tierItem.description}</p>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const AiPatternAnalysis = () => {
-    const patterns = [
-        { title: 'Two-Phase Strategy: Eradicate then Prevent', description: "Nearly all successful protocols involve an initial 'kill phase' (using antibiotics, herbals, or an elemental diet) followed by a crucial long-term 'prevention phase' to stop SIBO from returning." },
-        { title: 'Motility is King: The Prokinetic Pattern', description: 'Restoring the gut\'s natural cleansing wave (the Migrating Motor Complex or MMC) is the most consistent theme. Prokinetics like ginger & artichoke or prescription options are key for long-term success.' },
-        { title: "The 'Top-Down' Approach: Supporting the Full System", description: 'Many methods recognize SIBO as a symptom of a larger digestive issue. Supporting stomach acid (Betaine HCL) and bile flow ensures food is properly broken down before it can feed an overgrowth.' },
-        { title: 'Strategic Use of Diet', description: 'Diet (like Low FODMAP) is used as a temporary tool to manage symptoms and support the kill phase, not as a standalone cure. Meal spacing (4-5 hours between meals) is also emphasized to allow the MMC to work.' },
-    ];
-
-    return (
-        <div className="max-w-4xl mx-auto mt-16 rounded-xl border border-indigo-200 bg-indigo-50 p-6 shadow-md">
-            <h2 className="text-center text-2xl font-bold text-indigo-800">AI Pattern Analysis: Common Themes in SIBO Recovery</h2>
-            <ul className="mt-6 space-y-4">
-                {patterns.map((pattern) => (
-                    <li key={pattern.title} className="flex items-start">
-                        <svg className="mr-3 mt-1 h-6 w-6 flex-shrink-0 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                        <div>
-                            <h4 className="font-semibold text-indigo-700">{pattern.title}</h4>
-                            <p className="text-sm text-indigo-600">{pattern.description}</p>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const AudioSection = () => {
-    return (
-        <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">SIBO Educational Podcast</h2>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">SIBO Unpacked: Your Gut Detective Guide</h3>
-                <p className="text-gray-600 mb-4">
-                    Listen to this AI-generated podcast discussing Small Intestinal Bacterial Overgrowth, its causes, symptoms, and personalized healing approaches.
-                </p>
-                <audio 
-                    controls 
-                    className="w-full"
-                    preload="metadata"
-                >
-                    <source src="https://firebasestorage.googleapis.com/v0/b/sibo-recovery-app.firebasestorage.app/o/SIBO%20Unpacked_%20Your%20Gut%20Detective%20Guide%20to%20Bloating%2C%20Pain%2C%20and%20Personalized%20Healing.mp3?alt=media&token=136277f0-b710-4f2c-91d2-5b889ca1b4e8" type="audio/mpeg" />
-                    Your browser does not support the audio element.
-                </audio>
-                <p className="text-xs text-gray-500 mt-2">
-                    Note: This content is AI-generated for educational purposes. Always consult healthcare professionals for medical advice.
-                </p>
-            </div>
-        </div>
-    );
-};
-
-// ---------------- Header (Auth) ----------------
-const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
-    const handleLogin = async () => {
-        if (!auth || !googleProvider) return;
-        try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-            // Handle specific error codes
-            if (error.code === 'auth/popup-closed-by-user') {
-                console.log('Sign-in popup was closed by user');
-            } else if (error.code === 'auth/popup-blocked') {
-                alert('Pop-up was blocked. Please allow pop-ups for this site and try again.');
-            } else {
-                alert('Sign-in failed. Please try again.');
-            }
-        }
-    };
-    
-    return (
-        <header className="flex items-center justify-between bg-white p-4 shadow-sm">
-            <button onClick={onGoHome} className="text-xl font-bold text-gray-800">
-                SIBO Recovery Hub
-            </button>
-            <div className="flex items-center space-x-4">
-                <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
-                    Submit a Method
-                </button>
-                <button onClick={onFeedback} className="font-semibold text-purple-600 hover:text-purple-800">
-                    Feedback
-                </button>
-                {user ? (
-                    <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                            {user.photoURL && (
-                                <img 
-                                    src={user.photoURL} 
-                                    alt="Profile" 
-                                    className="w-8 h-8 rounded-full"
-                                />
-                            )}
-                            <span className="hidden text-sm text-gray-600 sm:inline">
-                                Welcome, {user.displayName || `User ${user.uid.substring(0, 6)}...`}
-                            </span>
-                        </div>
-                        <button onClick={() => auth && signOut(auth)} className="font-semibold text-red-600 hover:text-red-800">
-                            Sign Out
-                        </button>
-                    </div>
-                ) : (
-                    <button 
-                        onClick={handleLogin} 
-                        className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                    >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        Sign in with Google
-                    </button>
-                )}
-            </div>
-        </header>
-    );
-};
-
+                            <p className="text-gray-600 text-sm">{tierItem.description
