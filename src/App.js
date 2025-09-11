@@ -63,30 +63,6 @@ const isFirebaseConfigValid = () => {
 let app;
 let db;
 let auth;
-if (isFirebaseConfigValid()) {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  auth = getAuth(app);
-} else {
-  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
-}
-
-// Rest of your code remains exactly the same from here...
-    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
-}
-
-// Initialize Firebase only if config present
-let app;
-let db;
-let auth;
-if (isFirebaseConfigValid()) {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  auth = getAuth(app);
-} else {
-  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
-}
-
 // ---------------- Data for SIBO Methods ----------------
 const siboMethodsData = [
     {
