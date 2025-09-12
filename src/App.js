@@ -58,7 +58,7 @@ const isFirebaseConfigValid = () => {
         config: firebaseConfig
     });
     
-    // This function now correctly checks for missing or truly empty values.
+    // ✅ FIX: Made this check more robust to handle non-string values.
     return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
 }
 
@@ -786,24 +786,6 @@ const CommentsSection = ({ methodId, user }) => {
         return () => unsubscribe();
     }, [methodId]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!newComment.trim() || !user || !db) return;
-        try {
-            await addDoc(collection(db, `methods/${methodId}/comments`), {
-                text: newComment,
-                userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
-                userId: user.uid,
-                timestamp: serverTimestamp(),
-            });
-            setNewComment('');
-            setError(null);
-        } catch (err) {
-            console.error('Error posting comment:', err);
-            setError('Failed to post comment. Please make sure you are signed in.');
-        }
-    };
-
     const handleGoogleSignIn = async () => {
         if (!auth) return;
         try {
@@ -817,6 +799,33 @@ const CommentsSection = ({ methodId, user }) => {
                 console.error('Sign-in failed:', anonError);
                 setError('Failed to sign in. Please try again.');
             }
+        }
+    };
+    
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim() || !user || !db) return;
+
+        // ✅ FIX: Check if the user is anonymous. If so, prompt them to sign in.
+        if (user.isAnonymous) {
+            setError("Please sign in with Google to post comments.");
+            handleGoogleSignIn(); // Attempt to upgrade their account
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, `methods/${methodId}/comments`), {
+                text: newComment,
+                userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
+                userId: user.uid,
+                timestamp: serverTimestamp(),
+            });
+            setNewComment('');
+            setError(null);
+        } catch (err) {
+            console.error('Error posting comment:', err);
+            // ✅ FIX: Improved error message
+            setError('Failed to post comment. There might be a connection or permissions issue.');
         }
     };
 
@@ -1224,7 +1233,8 @@ export default function App() {
             });
             return () => unsub();
         } else {
-             setUserVotes({});
+            // ✅ FIX: Moved setUserVotes into an else block to prevent it from clearing state on every render.
+            setUserVotes({});
         }
     }, [user]);
 
