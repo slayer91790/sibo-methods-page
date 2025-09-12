@@ -59,7 +59,7 @@ const isFirebaseConfigValid = () => {
     });
     
     // This function now correctly checks for missing or truly empty values.
-    return firebaseConfig && Object.values(firebaseConfig).every(value => value && value.trim() !== '');
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
 }
 
 // Initialize Firebase only if config present
@@ -512,8 +512,8 @@ const AudioSection = () => {
                 <p className="text-gray-600 mb-4">
                     Listen to this AI-generated podcast discussing Small Intestinal Bacterial Overgrowth, its causes, symptoms, and personalized healing approaches.
                 </p>
-                <audio 
-                    controls 
+                <audio
+                    controls
                     className="w-full"
                     preload="metadata"
                 >
@@ -694,7 +694,7 @@ const MethodDetailPage = ({ method, onBack, user }) => (
             </div>
             <p className="text-sm">{method.citation.text}</p>
             {method.citation.url && (
-                
+                <a
                     href={method.citation.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1070,7 +1070,7 @@ const FeedbackPage = ({ onBack, user }) => {
 
 // ---------------- Gemini Advisor ----------------
 const GeminiAdvisor = ({ methods, onClose }) => {
-    const allSymptoms = [...new Set(methods.flatMap((m) => m.commonSymptoms))];
+    const allSymptoms = [...new Set(methods.flatMap((m) => m.commonSymptoms || []))];
     const [selectedSymptoms, setSelectedSymptoms] = useState([]);
     const [advice, setAdvice] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -1223,8 +1223,9 @@ export default function App() {
                 setUserVotes(mine);
             });
             return () => unsub();
+        } else {
+             setUserVotes({});
         }
-        setUserVotes({});
     }, [user]);
 
     const handleSelectMethod = (id) => {
@@ -1246,7 +1247,8 @@ export default function App() {
         if (!currentUser) {
             try {
                 const provider = new GoogleAuthProvider();
-                currentUser = (await signInWithPopup(auth, provider)).user;
+                const result = await signInWithPopup(auth, provider);
+                 currentUser = result.user;
             } catch (e) {
                 console.error('Sign-in for vote failed', e);
                 return;
@@ -1329,7 +1331,12 @@ export default function App() {
     // Page router
     const renderPage = () => {
         switch (currentPage) {
-            case 'detail': return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
+            case 'detail':
+                if (!selectedMethod) {
+                    handleBack();
+                    return null;
+                }
+                return <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />;
             case 'submit': return <SubmitMethodPage onBack={handleBack} user={user} />;
             case 'feedback': return <FeedbackPage onBack={handleBack} user={user} />;
             case 'list':
