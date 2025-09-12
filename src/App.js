@@ -1,4 +1,4 @@
-/* global __firebase_config */
+/* global __firebase_config, __initial_auth_token, __app_id */
 import React, { useState, useEffect } from 'react';
 
 /**
@@ -16,6 +16,7 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken, // ✅ FIX: Import signInWithCustomToken
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -46,6 +47,9 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     };
 }
 
+// ✅ FIX: Get the app ID from the global scope for correct database paths
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-sibo-app';
+
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
 // Helper to verify config
@@ -58,7 +62,6 @@ const isFirebaseConfigValid = () => {
         config: firebaseConfig
     });
     
-    // ✅ FIX: Made this check more robust to handle non-string values.
     return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
 }
 
@@ -771,7 +774,8 @@ const CommentsSection = ({ methodId, user }) => {
 
     useEffect(() => {
         if (!db) return;
-        const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
+        // ✅ FIX: Correct Firestore path for comments
+        const commentsQuery = query(collection(db, `/artifacts/${appId}/public/data/methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
         const unsubscribe = onSnapshot(
             commentsQuery,
             (snapshot) => {
@@ -793,12 +797,7 @@ const CommentsSection = ({ methodId, user }) => {
             await signInWithPopup(auth, provider);
         } catch (error) {
             console.error('Google sign-in failed:', error);
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Sign-in failed:', anonError);
-                setError('Failed to sign in. Please try again.');
-            }
+            setError('Failed to sign in. Please try again.');
         }
     };
     
@@ -806,15 +805,15 @@ const CommentsSection = ({ methodId, user }) => {
         e.preventDefault();
         if (!newComment.trim() || !user || !db) return;
 
-        // ✅ FIX: Check if the user is anonymous. If so, prompt them to sign in.
         if (user.isAnonymous) {
             setError("Please sign in with Google to post comments.");
-            handleGoogleSignIn(); // Attempt to upgrade their account
+            handleGoogleSignIn(); 
             return;
         }
 
         try {
-            await addDoc(collection(db, `methods/${methodId}/comments`), {
+            // ✅ FIX: Correct Firestore path for adding a new comment
+            await addDoc(collection(db, `/artifacts/${appId}/public/data/methods/${methodId}/comments`), {
                 text: newComment,
                 userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
                 userId: user.uid,
@@ -824,7 +823,6 @@ const CommentsSection = ({ methodId, user }) => {
             setError(null);
         } catch (err) {
             console.error('Error posting comment:', err);
-            // ✅ FIX: Improved error message
             setError('Failed to post comment. There might be a connection or permissions issue.');
         }
     };
@@ -893,7 +891,8 @@ const SubmitMethodPage = ({ onBack, user }) => {
         if (!user || !db) return;
         setIsSubmitting(true);
         try {
-            await addDoc(collection(db, 'submissions'), {
+            // ✅ FIX: Correct Firestore path for submissions
+            await addDoc(collection(db, `/artifacts/${appId}/public/data/submissions`), {
                 ...formData,
                 submittedBy: user.uid,
                 submittedAt: serverTimestamp(),
@@ -915,15 +914,10 @@ const SubmitMethodPage = ({ onBack, user }) => {
             await signInWithPopup(auth, provider);
         } catch (error) {
             console.error('Google sign-in failed:', error);
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Sign-in failed:', anonError);
-            }
         }
     };
 
-    if (!user) {
+    if (!user || user.isAnonymous) { // ✅ FIX: Require full sign-in for this page
         return (
             <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit a Method</h1>
@@ -999,7 +993,8 @@ const FeedbackPage = ({ onBack, user }) => {
         if (!feedback.trim() || !user || !db) return;
         setIsSubmitting(true);
         try {
-            await addDoc(collection(db, 'feedback'), {
+            // ✅ FIX: Correct Firestore path for feedback
+            await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
                 feedbackText: feedback,
                 submittedBy: user.uid,
                 submittedAt: serverTimestamp(),
@@ -1021,15 +1016,10 @@ const FeedbackPage = ({ onBack, user }) => {
             await signInWithPopup(auth, provider);
         } catch (error) {
             console.error('Google sign-in failed:', error);
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Sign-in failed:', anonError);
-            }
         }
     };
 
-    if (!user) {
+    if (!user || user.isAnonymous) { // ✅ FIX: Require full sign-in for this page
         return (
             <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit Feedback</h1>
@@ -1194,12 +1184,23 @@ export default function App() {
             setAuthReady(true);
             return;
         }
-        const unsub = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
+        // ✅ FIX: Correct authentication flow using custom token or anonymous fallback
+        const signIn = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (error) {
+                    console.error("Custom token sign-in failed, falling back to anonymous", error);
+                    await signInAnonymously(auth);
+                }
             } else {
-                setUser(null);
+                await signInAnonymously(auth);
             }
+        };
+        signIn();
+
+        const unsub = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
             setAuthReady(true);
         });
         return () => unsub();
@@ -1208,11 +1209,12 @@ export default function App() {
     // Aggregate votes (per method id)
     useEffect(() => {
         if (!db) return;
-        const votesCollection = collection(db, 'votes');
+        // ✅ FIX: Correct Firestore path for votes
+        const votesCollection = collection(db, `/artifacts/${appId}/public/data/votes`);
         const unsub = onSnapshot(votesCollection, (snapshot) => {
             const data = {};
             siboMethodsData.forEach((m) => (data[String(m.id)] = { likes: 0, dislikes: 0 }));
-            snapshot.forEach((d) => {
+            snapshot.docs.forEach((d) => { // Use .docs here
                 data[d.id] = d.data();
             });
             setVotes(data);
@@ -1223,17 +1225,18 @@ export default function App() {
     // Current user's votes
     useEffect(() => {
         if (user && db) {
-            const userVotesCollection = collection(db, `users/${user.uid}/userVotes`);
+            const userId = user.uid;
+            // ✅ FIX: Correct Firestore path for private user data
+            const userVotesCollection = collection(db, `/artifacts/${appId}/users/${userId}/userVotes`);
             const unsub = onSnapshot(userVotesCollection, (snapshot) => {
                 const mine = {};
-                snapshot.forEach((d) => {
+                snapshot.docs.forEach((d) => { // Use .docs here
                     mine[d.id] = d.data().vote;
                 });
                 setUserVotes(mine);
             });
             return () => unsub();
         } else {
-            // ✅ FIX: Moved setUserVotes into an else block to prevent it from clearing state on every render.
             setUserVotes({});
         }
     }, [user]);
@@ -1254,7 +1257,7 @@ export default function App() {
     const handleVote = async (id, voteType) => {
         if (!auth || !db) return;
         let currentUser = auth.currentUser;
-        if (!currentUser) {
+        if (!currentUser || currentUser.isAnonymous) { // ✅ FIX: Require full sign-in for voting
             try {
                 const provider = new GoogleAuthProvider();
                 const result = await signInWithPopup(auth, provider);
@@ -1266,8 +1269,11 @@ export default function App() {
         }
 
         const methodId = String(id);
-        const voteDocRef = doc(db, 'votes', methodId);
-        const userVoteDocRef = doc(db, `users/${currentUser.uid}/userVotes`, methodId);
+        const userId = currentUser.uid;
+
+        // ✅ FIX: Correct Firestore paths for transaction
+        const voteDocRef = doc(db, `/artifacts/${appId}/public/data/votes`, methodId);
+        const userVoteDocRef = doc(db, `/artifacts/${appId}/users/${userId}/userVotes`, methodId);
 
         try {
             await runTransaction(db, async (tx) => {
@@ -1371,3 +1377,4 @@ export default function App() {
         </main>
     );
 }
+
