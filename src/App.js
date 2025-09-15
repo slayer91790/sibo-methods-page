@@ -104,11 +104,11 @@ const siboMethodsData = [
                     { title: "For Methane-Dominant SIBO (IMO)", description: "A combination of Rifaximin (550mg, three times per day) and Neomycin (500mg, twice per day) or Metronidazole." },
                     { title: "Partially Hydrolyzed Guar Gum (PHGG)", description: "Some studies and patient accounts suggest taking 5g of PHGG with each dose of Rifaximin can enhance its effectiveness." }
                 ]
-           ]
             }
         ]
     }
-];  // This closes the siboMethodsData array
+];
+// This closes the siboMethodsData array
 			// ---------------- Helper Components ----------------
 const ThumbsUpIcon = ({ isSelected }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
