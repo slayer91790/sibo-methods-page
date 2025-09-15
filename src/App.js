@@ -1,368 +1,111 @@
-Looking at your code and the error message, the issue is with the Firebase database paths. The code appears to be using special paths that include `/artifacts/${appId}/` which suggests this might be running in a special environment (possibly Claude's artifact system or a similar sandbox).
+/* global __firebase_config */
+import React, { useState, useEffect } from 'react';
 
-The main problem is that these paths are likely incorrect for a standard Firebase deployment on Netlify. Here's how to fix it:
+/**
+ * SIBO Recovery Hub — single-file React SPA
+ * This version uses a hybrid configuration loader to work in both
+ * the development canvas and on a live Netlify site.
+ */
 
-## Fix the Firebase Database Paths
+// Import all Firebase functions we'll need
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
+  runTransaction,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 
-Replace all the special artifact paths with standard Firebase paths. Here are the changes needed:
-
-### 1. In the `CommentsSection` component (around line 846):
-
-**Replace:**
-```javascript
-const commentsQuery = query(collection(db, `/artifacts/${appId}/public/data/methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
-```
-
-**With:**
-```javascript
-const commentsQuery = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
-```
-
-### 2. Also in `CommentsSection` when adding a comment (around line 880):
-
-**Replace:**
-```javascript
-await addDoc(collection(db, `/artifacts/${appId}/public/data/methods/${methodId}/comments`), {
-```
-
-**With:**
-```javascript
-await addDoc(collection(db, `methods/${methodId}/comments`), {
-```
-
-### 3. In the `SubmitMethodPage` (around line 929):
-
-**Replace:**
-```javascript
-await addDoc(collection(db, `/artifacts/${appId}/public/data/submissions`), {
-```
-
-**With:**
-```javascript
-await addDoc(collection(db, `submissions`), {
-```
-
-### 4. In the `FeedbackPage` (around line 1033):
-
-**Replace:**
-```javascript
-await addDoc(collection(db, `/artifacts/${appId}/public/data/feedback`), {
-```
-
-**With:**
-```javascript
-await addDoc(collection(db, `feedback`), {
-```
-
-### 5. In the main `App` component for votes (around line 1172):
-
-**Replace:**
-```javascript
-const votesCollection = collection(db, `/artifacts/${appId}/public/data/votes`);
-```
-
-**With:**
-```javascript
-const votesCollection = collection(db, `votes`);
-```
-
-### 6. For user votes (around line 1189):
-
-**Replace:**
-```javascript
-const userVotesCollection = collection(db, `/artifacts/${appId}/users/${userId}/userVotes`);
-```
-
-**With:**
-```javascript
-const userVotesCollection = collection(db, `users/${userId}/userVotes`);
-```
-
-### 7. In the voting transaction (around line 1230-1231):
-
-**Replace:**
-```javascript
-const voteDocRef = doc(db, `/artifacts/${appId}/public/data/votes`, methodId);
-const userVoteDocRef = doc(db, `/artifacts/${appId}/users/${userId}/userVotes`, methodId);
-```
-
-**With:**
-```javascript
-const voteDocRef = doc(db, `votes`, methodId);
-const userVoteDocRef = doc(db, `users/${userId}/userVotes`, methodId);
-```
-
-## Also Remove Unused Variables
-
-At the top of your file (around line 1-48), remove or comment out:
-- Line 1: Remove `__initial_auth_token` and `__app_id` from the global comment
-- Line 18: Remove the `signInWithCustomToken` import if not using it
-- Line 48: Remove or comment out the `appId` variable
-
-## Summary
-
-The issue is that the code was written for a special environment with custom Firebase paths. For your standard Firebase deployment, you need to use normal collection paths without the `/artifacts/${appId}/` prefix.
-
-After making these changes:
-1. Save the file
-2. Commit with message: "Fix Firebase paths for production deployment"
-3. Push to trigger a new Netlify build
-
-// ---------------- Helper Components ----------------
-const ThumbsUpIcon = ({ isSelected }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z" />
-    </svg>
-);
-
-const ThumbsDownIcon = ({ isSelected }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 5.266V18a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4z" />
-    </svg>
-);
-
-const EvidenceTierBadge = ({ tier }) => {
-    const tiers = {
-        1: { text: 'Tier 1: Strong Evidence', color: 'bg-green-100 text-green-800' },
-        2: { text: 'Tier 2: Promising Evidence', color: 'bg-yellow-100 text-yellow-800' },
-        3: { text: 'Tier 3: Anecdotal / Case Report', color: 'bg-blue-100 text-blue-800' },
-        0: { text: 'Caution: No Evidence / Potential Harm', color: 'bg-red-100 text-red-800' },
+// --- Hybrid Firebase Configuration ---
+let firebaseConfig;
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    // Use config from the dev canvas environment if it exists
+    firebaseConfig = JSON.parse(__firebase_config);
+} else {
+    // For production, read directly from process.env at build time
+    firebaseConfig = {
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID,
     };
-    const tierInfo = tiers[tier] || { text: 'N/A', color: 'bg-gray-100 text-gray-800' };
-    return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tierInfo.color}`}>
-            {tierInfo.text}
-        </span>
-    );
-};
+}
 
-const EvidenceTierExplanation = () => {
-    const tiersData = [
-        { tier: 1, title: 'Tier 1: Strong Evidence', description: 'Backed by high-quality scientific research, such as double-blind, randomized controlled trials (RCTs). These are considered the "gold standard" in medical research.' },
-        { tier: 2, title: 'Tier 2: Promising Evidence', description: "Supported by pilot studies, smaller trials, or studies that weren't as rigorously controlled. The results are promising but require more research." },
-        { tier: 3, title: 'Tier 3: Anecdotal / Case Report', description: 'Primarily based on user experiences or case reports. While potentially effective for some, they lack formal scientific evidence.' },
-        { tier: 0, title: 'Caution: No Evidence / Potential Harm', description: 'Methods that have no scientific evidence for SIBO and may be considered potentially harmful by medical institutions.' },
-    ];
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
-    return (
-        <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Understanding the Evidence Tiers</h2>
-            <ul className="space-y-4">
-                {tiersData.map((tierItem) => (
-                    <li key={tierItem.tier} className="flex items-start">
-                        <div className="mr-4 mt-1 flex-shrink-0">
-                            <EvidenceTierBadge tier={tierItem.tier} />
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-gray-700">{tierItem.title}</h4>
-                            <p className="text-gray-600 text-sm">{tierItem.description}</p>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const AiPatternAnalysis = () => {
-    const patterns = [
-        { title: 'Two-Phase Strategy: Eradicate then Prevent', description: "Nearly all successful protocols involve an initial 'kill phase' (using antibiotics, herbals, or an elemental diet) followed by a crucial long-term 'prevention phase' to stop SIBO from returning." },
-        { title: 'Motility is King: The Prokinetic Pattern', description: 'Restoring the gut\'s natural cleansing wave (the Migrating Motor Complex or MMC) is the most consistent theme. Prokinetics like ginger & artichoke or prescription options are key for long-term success.' },
-        { title: "The 'Top-Down' Approach: Supporting the Full System", description: 'Many methods recognize SIBO as a symptom of a larger digestive issue. Supporting stomach acid (Betaine HCL) and bile flow ensures food is properly broken down before it can feed an overgrowth.' },
-        { title: 'Strategic Use of Diet', description: 'Diet (like Low FODMAP) is used as a temporary tool to manage symptoms and support the kill phase, not as a standalone cure. Meal spacing (4-5 hours between meals) is also emphasized to allow the MMC to work.' },
-    ];
-
-    return (
-        <div className="max-w-4xl mx-auto mt-16 rounded-xl border border-indigo-200 bg-indigo-50 p-6 shadow-md">
-            <h2 className="text-center text-2xl font-bold text-indigo-800">AI Pattern Analysis: Common Themes in SIBO Recovery</h2>
-            <ul className="mt-6 space-y-4">
-                {patterns.map((pattern) => (
-                    <li key={pattern.title} className="flex items-start">
-                        <svg className="mr-3 mt-1 h-6 w-6 flex-shrink-0 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                        <div>
-                            <h4 className="font-semibold text-indigo-700">{pattern.title}</h4>
-                            <p className="text-sm text-indigo-600">{pattern.description}</p>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const AudioSection = () => {
-    return (
-        <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">SIBO Educational Podcast</h2>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">SIBO Unpacked: Your Gut Detective Guide</h3>
-                <p className="text-gray-600 mb-4">
-                    Listen to this AI-generated podcast discussing Small Intestinal Bacterial Overgrowth, its causes, symptoms, and personalized healing approaches.
-                </p>
-                <audio
-                    controls
-                    className="w-full"
-                    preload="metadata"
-                >
-                    <source src="https://firebasestorage.googleapis.com/v0/b/sibo-recovery-app.firebasestorage.app/o/SIBO%20Unpacked_%20Your%20Gut%20Detective%20Guide%20to%20Bloating%2C%20Pain%2C%20and%20Personalized%20Healing.mp3?alt=media&token=136277f0-b710-4f2c-91d2-5b889ca1b4e8" type="audio/mpeg" />
-                    Your browser does not support the audio element.
-                </audio>
-                <p className="text-xs text-gray-500 mt-2">
-                    Note: This content is AI-generated for educational purposes. Always consult healthcare professionals for medical advice.
-                </p>
-            </div>
-        </div>
-    );
-};
-
-// ---------------- Header (Auth) ----------------
-const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
-    const handleLogin = async () => {
-        if (!auth) return;
-        try {
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-            // If Google fails, try anonymous sign-in as backup
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Fallback anonymous sign-in also failed:', anonError);
-            }
-        }
-    };
+// Helper to verify config
+const isFirebaseConfigValid = () => {
+    // Debug logging to see what we're getting
+    console.log('Firebase config check:', {
+        apiKey: firebaseConfig?.apiKey ? 'present' : 'missing',
+        authDomain: firebaseConfig?.authDomain ? 'present' : 'missing',
+        projectId: firebaseConfig?.projectId ? 'present' : 'missing',
+        config: firebaseConfig
+    });
     
-    return (
-        <header className="flex items-center justify-between bg-white p-4 shadow-sm">
-            <button onClick={onGoHome} className="text-xl font-bold text-gray-800">
-                SIBO Recovery Hub
-            </button>
-            <div className="flex items-center space-x-4">
-                <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
-                    Submit a Method
-                </button>
-                <button onClick={onFeedback} className="font-semibold text-purple-600 hover:text-purple-800">
-                    Feedback
-                </button>
-                {user ? (
-                    <div className="flex items-center space-x-4">
-                        <span className="hidden text-sm text-gray-600 sm:inline">
-                            Welcome, {user.displayName || `User ${user.uid.substring(0, 6)}...`}
-                        </span>
-                        <button onClick={() => auth && signOut(auth)} className="font-semibold text-red-600 hover:text-red-800">
-                            Log Out
-                        </button>
-                    </div>
-                ) : (
-                    <button onClick={handleLogin} className="font-semibold text-blue-600 hover:text-blue-800">
-                        Sign In with Google
-                    </button>
-                )}
-            </div>
-        </header>
-    );
-};
+    return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
+}
 
-// ---------------- Main UI ----------------
-const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
-    <div
-        className="flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-transform hover:-translate-y-1"
-        onClick={() => onSelect(method.id)}
-    >
-        <div className="p-6">
-            <div className="mb-3">
-                <EvidenceTierBadge tier={method.evidenceTier} />
-            </div>
-            <h3 className="mb-2 text-xl font-bold text-gray-800">{method.title}</h3>
-            <p className="mb-4 text-gray-600">{method.summary}</p>
-        </div>
-        <div className="flex items-center justify-end space-x-4 bg-gray-50 px-6 py-4">
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onVote(method.id, 'like');
-                }}
-                className={`flex items-center space-x-2 transition-colors ${
-                    userVote === 'like' ? 'text-green-600' : 'text-gray-500 hover:text-green-600'
-                }`}
-            >
-                <ThumbsUpIcon isSelected={userVote === 'like'} />
-                <span className="font-semibold">{votes.likes}</span>
-            </button>
-            <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onVote(method.id, 'dislike');
-                }}
-                className={`flex items-center space-x-2 transition-colors ${
-                    userVote === 'dislike' ? 'text-red-600' : 'text-gray-500 hover:text-red-600'
-                }`}
-            >
-                <ThumbsDownIcon isSelected={userVote === 'dislike'} />
-                <span className="font-semibold">{votes.dislikes}</span>
-            </button>
-        </div>
-    </div>
-);
+// Initialize Firebase only if config present
+let app = null;
+let db = null;
+let auth = null;
 
-const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onSortChange, onOpenAdvisor }) => (
-    <div className="p-4 sm:p-6 md:p-8">
-        <header className="mb-10 text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-                Community-Sourced SIBO Protocols
-            </h1>
-            <p className="mx-auto mt-4 max-w-3xl text-lg text-gray-600">
-                Explore recovery methods backed by community experience and scientific evidence. Vote on what you've tried and see what has
-                worked for others.
-            </p>
-            <button
-                onClick={onOpenAdvisor}
-                className="mt-6 transform rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-3 font-bold text-white shadow-lg transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-xl"
-            >
-                Get Help from AI Protocol Advisor
-            </button>
-        </header>
+if (isFirebaseConfigValid()) {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  console.log('Firebase initialized successfully', app);
+} else {
+  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
+}
 
-        <div className="mb-6 flex justify-end">
-            <select
-                onChange={(e) => onSortChange(e.target.value)}
-                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            >
-                <option value="evidence">Sort by Evidence Tier</option>
-                <option value="likes">Sort by Most Likes</option>
-            </select>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {methods.map((method) => (
-                <MethodCard
-                    key={method.id}
-                    method={method}
-                    onSelect={onSelectMethod}
-                    onVote={onVote}
-                    votes={votes[method.id] || { likes: 0, dislikes: 0 }}
-                    userVote={userVotes[method.id] || null}
-                />)
-            )}
-        </div>
-
-        <AiPatternAnalysis />
-        <AudioSection />
-        <EvidenceTierExplanation />
-
-        <footer className="mt-12 px-4 text-center text-sm text-gray-500">
-            <p>
-                Disclaimer: This information is for educational purposes only and is not medical advice. Always consult with a qualified
-                healthcare professional before starting any new treatment.
-            </p>
-        </footer>
-    </div>
-);
-
-// ---------------- Helper Components ----------------
+// ---------------- Data for SIBO Methods ----------------
+const siboMethodsData = [
+    {
+        id: 2,
+        title: "Rifaximin (Pharmaceutical) Protocol",
+        summary: "Utilizes the prescription antibiotic Rifaximin, often in combination with another antibiotic for methane-dominant SIBO, as the primary means of eradicating the bacterial overgrowth.",
+        evidenceTier: 1,
+        commonSymptoms: ["Hydrogen-dominant SIBO", "Diarrhea", "Bloating", "Methane SIBO (with Neomycin)"],
+        citation: {
+            text: "A landmark 2010 double-blind, placebo-controlled trial demonstrating the efficacy of Rifaximin for non-constipation IBS, which has significant overlap with SIBO.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/21182358/"
+        },
+        sampleDay: {
+            title: "A Sample Day During the Rifaximin Protocol",
+            schedule: [
+                { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
+                { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
+                { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
+                { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Antibiotic Treatment (14-day course)",
+                steps: [
+                    { title: "For Hydrogen-Dominant SIBO", description: "Rifaximin (Xifaxan) 550mg, three times per day." },
+                    { title: "For Methane-Dominant SIBO (IMO)", description: "A combination of Rifaximin (550mg, three times per day) and Neomycin (500mg, twice per day) or Metronidazole." },
+                    { title: "Partially Hydrolyzed Guar Gum (PHGG)", description: "Some studies and patient accounts suggest taking 5g of PHGG with each dose of Rifaximin can enhance its effectiveness." }
+                ]
+            },
+			// ---------------- Helper Components ----------------
 const ThumbsUpIcon = ({ isSelected }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z" />
@@ -872,9 +615,6 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onS
         </footer>
     </div>
 );
-
-// Continuing in next message...
-```
 
 // ---------------- Feedback ----------------
 const FeedbackPage = ({ onBack, user }) => {
