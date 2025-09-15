@@ -363,8 +363,6 @@ const MethodListPage = ({ methods, onSelectMethod, onVote, votes, userVotes, onS
     </div>
 );
 
-Continuing with the complete code (part 2):
-
 ```javascript
 // ---------------- Helper Components ----------------
 const ThumbsUpIcon = ({ isSelected }) => (
