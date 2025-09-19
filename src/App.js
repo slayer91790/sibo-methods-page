@@ -1,4 +1,4 @@
-/* global __firebase_config, process */
+/* global __firebase_config */
 import React, { useState, useEffect } from 'react';
 
 // Import all Firebase functions we'll need
@@ -10,6 +10,7 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
 } from 'firebase/auth';
 import {
   getFirestore,
