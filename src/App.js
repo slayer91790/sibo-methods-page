@@ -21,7 +21,14 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  setDoc,
+  getDoc,
+  deleteDoc,
 } from 'firebase/firestore';
+
+// --- Admin Configuration ---
+// Replace with the actual UID of the admin user from Firebase Authentication
+const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
@@ -773,8 +780,6 @@ const CommentsSection = ({ methodId, user }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [error, setError] = useState(null);
-    const [commentVotes, setCommentVotes] = useState({});
-    const [userCommentVotes, setUserCommentVotes] = useState({});
 
     useEffect(() => {
         if (!db) return;
@@ -784,18 +789,6 @@ const CommentsSection = ({ methodId, user }) => {
             (snapshot) => {
                 const fetched = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
                 setComments(fetched);
-
-                // Fetch vote counts for each comment
-                const votes = {};
-                fetched.forEach(comment => {
-                    const voteDocRef = doc(db, `methods/${methodId}/comments/${comment.id}/votes/${comment.id}`);
-                    onSnapshot(voteDocRef, (voteSnap) => {
-                        if (voteSnap.exists()) {
-                            votes[comment.id] = voteSnap.data();
-                            setCommentVotes({ ...votes });
-                        }
-                    });
-                });
             },
             (err) => {
                 console.error('Error fetching comments:', err);
@@ -805,22 +798,21 @@ const CommentsSection = ({ methodId, user }) => {
         return () => unsubscribe();
     }, [methodId]);
 
-    // Track user's votes on comments
-    useEffect(() => {
-        if (user && db) {
-            const userVotesQuery = collection(db, `users/${user.uid}/commentVotes`);
-            const unsubscribe = onSnapshot(userVotesQuery, (snapshot) => {
-                const votes = {};
-                snapshot.forEach((doc) => {
-                    votes[doc.id] = doc.data().vote;
-                });
-                setUserCommentVotes(votes);
-            });
-            return () => unsubscribe();
-        } else {
-            setUserCommentVotes({});
+    const handleGoogleSignIn = async () => {
+        if (!auth) return;
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error('Google sign-in failed:', error);
+            try {
+                await signInAnonymously(auth);
+            } catch (anonError) {
+                console.error('Sign-in failed:', anonError);
+                setError('Failed to sign in. Please try again.');
+            }
         }
-    }, [user, methodId]);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -833,62 +825,9 @@ const CommentsSection = ({ methodId, user }) => {
                 timestamp: serverTimestamp(),
             });
             setNewComment('');
-            setError(null);
         } catch (err) {
             console.error('Error posting comment:', err);
             setError('Failed to post comment. Please make sure you are signed in.');
-        }
-    };
-
-    const handleCommentVote = async (commentId, voteType) => {
-        if (!user || !db) {
-            setError('Please sign in to vote');
-            return;
-        }
-        const voteDocRef = doc(db, `methods/${methodId}/comments/${commentId}/votes/${commentId}`);
-        const userVoteRef = doc(db, `users/${user.uid}/commentVotes/${commentId}`);
-        try {
-            await runTransaction(db, async (transaction) => {
-                const voteDoc = await transaction.get(voteDocRef);
-                const userVoteDoc = await transaction.get(userVoteRef);
-                let likes = voteDoc.exists() ? voteDoc.data().likes || 0 : 0;
-                let dislikes = voteDoc.exists() ? voteDoc.data().dislikes || 0 : 0;
-                const previousVote = userVoteDoc.exists() ? userVoteDoc.data().vote : null;
-
-                // Remove previous vote
-                if (previousVote === 'like') likes = Math.max(0, likes - 1);
-                if (previousVote === 'dislike') dislikes = Math.max(0, dislikes - 1);
-
-                // Add new vote (toggle off if same vote)
-                if (voteType !== previousVote) {
-                    if (voteType === 'like') likes++;
-                    if (voteType === 'dislike') dislikes++;
-                    transaction.set(userVoteRef, { vote: voteType, methodId, commentId });
-                } else {
-                    transaction.delete(userVoteRef);
-                }
-                transaction.set(voteDocRef, { likes, dislikes }, { merge: true });
-            });
-        } catch (err) {
-            console.error('Error voting on comment:', err);
-            setError('Failed to record vote');
-        }
-    };
-
-    const handleGoogleSignIn = async () => {
-        if (!auth) return;
-        try {
-            const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-            // Fallback to anonymous
-            try {
-                await signInAnonymously(auth);
-            } catch (anonError) {
-                console.error('Sign-in failed:', anonError);
-                setError('Failed to sign in. Please try again.');
-            }
         }
     };
     return (
@@ -926,43 +865,15 @@ const CommentsSection = ({ methodId, user }) => {
                 {error && <p className="mb-4 text-red-500">{error}</p>}
                 <div className="space-y-6">
                     {comments.length > 0 ? (
-                        comments.map((c) => {
-                            const votes = commentVotes[c.id] || { likes: 0, dislikes: 0 };
-                            const userVote = userCommentVotes[c.id];
-                            return (
-                                <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <p className="font-semibold text-gray-800">{c.userName}</p>
-                                            <p className="mb-2 text-xs text-gray-500">
-                                                {c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
-                                            </p>
-                                            <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-2 ml-4">
-                                            <button
-                                                onClick={() => handleCommentVote(c.id, 'like')}
-                                                className={`flex items-center space-x-1 transition-colors ${
-                                                    userVote === 'like' ? 'text-green-600' : 'text-gray-500 hover:text-green-600'
-                                                }`}
-                                            >
-                                                <ThumbsUpIcon isSelected={userVote === 'like'} />
-                                                <span className="text-sm font-semibold">{votes.likes}</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleCommentVote(c.id, 'dislike')}
-                                                className={`flex items-center space-x-1 transition-colors ${
-                                                    userVote === 'dislike' ? 'text-red-600' : 'text-gray-500 hover:text-red-600'
-                                                }`}
-                                            >
-                                                <ThumbsDownIcon isSelected={userVote === 'dislike'} />
-                                                <span className="text-sm font-semibold">{votes.dislikes}</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
+                        comments.map((c) => (
+                            <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
+                                <p className="font-semibold text-gray-800">{c.userName}</p>
+                                <p className="mb-2 text-xs text-gray-500">
+                                    {c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
+                                </p>
+                                <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
+                            </div>
+                        ))
                     ) : (
                         <p className="text-gray-500">No comments yet. Be the first to share your experience!</p>
                     )}
@@ -976,9 +887,7 @@ const CommentsSection = ({ methodId, user }) => {
 const SubmitMethodPage = ({ onBack, user }) => {
     const [formData, setFormData] = useState({ title: '', summary: '', sourceLink: '', symptoms: '', protocol: '', sampleDay: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
-
     const handleChange = (e) => setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!user || !db) return;
@@ -999,22 +908,21 @@ const SubmitMethodPage = ({ onBack, user }) => {
         }
     };
 
-    const handleGoogleSignIn = async () => {
-        if (!auth || !googleProvider) return;
-        try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-        }
-    };
-
     if (!user) {
         return (
             <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit a Method</h1>
                 <p className="mb-8 text-lg text-gray-600">
                     Please{' '}
-                    <button onClick={handleGoogleSignIn} className="font-semibold text-blue-600 hover:underline">
+                    <button onClick={async () => {
+                        if (auth && googleProvider) {
+                            try {
+                                await signInWithPopup(auth, googleProvider);
+                            } catch (error) {
+                                console.error('Google sign-in failed:', error);
+                            }
+                        }
+                    }} className="font-semibold text-blue-600 hover:underline">
                         sign in with Google
                     </button>{' '}
                     to submit a new method. This helps us keep the submissions genuine.
@@ -1078,7 +986,6 @@ const SubmitMethodPage = ({ onBack, user }) => {
 const FeedbackPage = ({ onBack, user }) => {
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!feedback.trim() || !user || !db) return;
@@ -1099,21 +1006,21 @@ const FeedbackPage = ({ onBack, user }) => {
         }
     };
 
-    const handleGoogleSignIn = async () => {
-        if (!auth || !googleProvider) return;
-        try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-        }
-    };
     if (!user) {
         return (
             <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">Submit Feedback</h1>
                 <p className="mb-8 text-lg text-gray-600">
                     Please{' '}
-                    <button onClick={handleGoogleSignIn} className="font-semibold text-blue-600 hover:underline">
+                    <button onClick={async () => {
+                        if (auth && googleProvider) {
+                            try {
+                                await signInWithPopup(auth, googleProvider);
+                            } catch (error) {
+                                console.error('Google sign-in failed:', error);
+                            }
+                        }
+                    }} className="font-semibold text-blue-600 hover:underline">
                         sign in with Google
                     </button>{' '}
                     to submit feedback.
@@ -1256,7 +1163,7 @@ const GeminiAdvisor = ({ methods, onClose }) => {
 };
 
 // ---------------- App ----------------
-const App = () => {
+function App() {
     const [currentPage, setCurrentPage] = useState('list');
     const [selectedMethodId, setSelectedMethodId] = useState(null);
     const [votes, setVotes] = useState({});
