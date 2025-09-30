@@ -1,5 +1,4 @@
-
-/* global __firebase_config */
+/* global __firebase_config, process */
 import React, { useState, useEffect } from 'react';
 
 // Import all Firebase functions we'll need
@@ -23,7 +22,14 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  setDoc,
+  getDoc,
+  deleteDoc,
 } from 'firebase/firestore';
+
+// --- Admin Configuration ---
+// Replace with the actual UID of the admin user from Firebase Authentication
+const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
 // --- Hybrid Firebase Configuration ---
 let firebaseConfig;
@@ -73,19 +79,13 @@ const siboMethodsData = [
         summary: "Utilizes the prescription antibiotic Rifaximin, often in combination with another antibiotic for methane-dominant SIBO, as the primary means of eradicating the bacterial overgrowth.",
         evidenceTier: 1,
         commonSymptoms: ["Hydrogen-dominant SIBO", "Diarrhea", "Bloating", "Methane SIBO (with Neomycin)"],
-        citation: {
-            text: "A landmark 2010 double-blind, placebo-controlled trial demonstrating the efficacy of Rifaximin for non-constipation IBS, which has significant overlap with SIBO.",
-            url: "https://pubmed.ncbi.nlm.nih.gov/21182358/"
-        },
-        sampleDay: {
-            title: "A Sample Day During the Rifaximin Protocol",
-            schedule: [
-                { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
-                { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
-                { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
-                { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
-            ]
-        },
+        citation: { text: "A landmark 2010 double-blind, placebo-controlled trial...", url: "https://pubmed.ncbi.nlm.nih.gov/21182358/" },
+        sampleDay: { title: "A Sample Day During the Rifaximin Protocol", schedule: [
+            { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
+            { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
+            { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
+            { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
+        ]},
         protocol: [
             {
                 phase: "Phase 1: Antibiotic Treatment (14-day course)",
