@@ -1,7 +1,6 @@
 /* global __firebase_config */
 import React, { useState, useEffect } from 'react';
 
-// Import all Firebase functions we'll need
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
@@ -23,13 +22,10 @@ import {
   orderBy,
 } from 'firebase/firestore';
 
-// --- Hybrid Firebase Configuration ---
 let firebaseConfig;
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-    // Use config from the dev canvas environment if it exists
     firebaseConfig = JSON.parse(__firebase_config);
 } else {
-    // For production, read directly from process.env at build time
     firebaseConfig = {
       apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
       authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -42,13 +38,10 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
 
 const GEMINI_API_KEY = typeof process !== 'undefined' ? process.env.REACT_APP_GEMINI_API_KEY : '';
 
-
-// Helper to verify config
 const isFirebaseConfigValid = () => {
     return firebaseConfig && Object.values(firebaseConfig).every(value => value && String(value).trim() !== '');
 }
 
-// Initialize Firebase only if config present
 let app = null;
 let db = null;
 let auth = null;
@@ -63,7 +56,6 @@ if (isFirebaseConfigValid()) {
   console.error('Firebase configuration is missing or incomplete. Check environment variables.');
 }
 
-// ---------------- Data for SIBO Methods ----------------
 const siboMethodsData = [
     {
         id: 2,
@@ -71,13 +63,19 @@ const siboMethodsData = [
         summary: "Utilizes the prescription antibiotic Rifaximin, often in combination with another antibiotic for methane-dominant SIBO, as the primary means of eradicating the bacterial overgrowth.",
         evidenceTier: 1,
         commonSymptoms: ["Hydrogen-dominant SIBO", "Diarrhea", "Bloating", "Methane SIBO (with Neomycin)"],
-        citation: { text: "A landmark 2010 double-blind, placebo-controlled trial...", url: "https://pubmed.ncbi.nlm.nih.gov/21182358/" },
-        sampleDay: { title: "A Sample Day During the Rifaximin Protocol", schedule: [
-             { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
-             { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
-             { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
-             { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
-        ]},
+        citation: {
+            text: "A landmark 2010 double-blind, placebo-controlled trial demonstrating the efficacy of Rifaximin for non-constipation IBS, which has significant overlap with SIBO.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/21182358/"
+        },
+        sampleDay: {
+            title: "A Sample Day During the Rifaximin Protocol",
+            schedule: [
+                { time: "Morning (8 AM)", action: "Take first dose of Rifaximin (550mg) with a low-FODMAP breakfast. Example: Scrambled eggs with spinach. Take 5g of PHGG mixed with water." },
+                { time: "Afternoon (2 PM)", action: "Take second dose of Rifaximin (550mg) with a low-FODMAP lunch. Example: Grilled chicken salad with olive oil dressing (no high-FODMAP vegetables)." },
+                { time: "Evening (8 PM)", action: "Take third dose of Rifaximin (550mg) with a low-FODMAP dinner. Example: Baked salmon with steamed carrots and quinoa." },
+                { time: "Bedtime (10 PM)", action: "Begin 12-hour overnight fast to allow the Migrating Motor Complex (MMC) to work." }
+            ]
+        },
         protocol: [
             {
                 phase: "Phase 1: Antibiotic Treatment (14-day course)",
@@ -98,10 +96,308 @@ const siboMethodsData = [
             }
         ]
     },
-    // ... all other method objects are included but redacted for brevity
+    {
+        id: 1,
+        title: "Herbal Antimicrobial Protocol",
+        summary: "Focuses on using natural compounds with antimicrobial properties to reduce bacterial overgrowth in the small intestine. Often favored by those seeking a less aggressive alternative to prescription antibiotics.",
+        evidenceTier: 2,
+        commonSymptoms: ["Mixed SIBO (Hydrogen & Methane)", "Bloating", "General Dysbiosis", "Candida Overgrowth"],
+        citation: {
+            text: "A 2014 study showing herbal therapy (Candibactin-AR and Candibactin-BR) is as effective as Rifaximin for SIBO resolution in a non-controlled trial.",
+            url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4030608/"
+        },
+        sampleDay: {
+            title: "A Sample Day During the Herbal Protocol",
+            schedule: [
+                { time: "Morning (8 AM)", action: "Take first dose of herbal antimicrobials (e.g., Berberine, Oregano Oil) with a low-FODMAP breakfast. Take biofilm disruptor 30 minutes prior on an empty stomach." },
+                { time: "Afternoon (2 PM)", action: "Low-FODMAP lunch. Ensure 4-5 hours of spacing between meals." },
+                { time: "Evening (8 PM)", action: "Take second dose of herbal antimicrobials with a low-FODMAP dinner. Take biofilm disruptor 30 minutes prior." },
+                { time: "Bedtime (10 PM)", action: "Take prokinetic (e.g., Ginger & Artichoke) on an empty stomach, at least 2 hours after dinner." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Antimicrobial Treatment (4-6 weeks)",
+                steps: [
+                    {
+                        title: "Herbal Combination",
+                        description: "A rotating combination of two or three of the following herbal antimicrobials is taken daily with meals.",
+                        items: [
+                            "Berberine: 500mg, 2-3 times per day.",
+                            "Oregano Oil (enteric-coated): 100-200mg of carvacrol, 2-3 times per day.",
+                            "Neem Extract: 400-500mg, 2-3 times per day.",
+                            "Allicin (from garlic extract): 400-500mg, 2-3 times per day.",
+                        ],
+                    },
+                    {
+                        title: "Biofilm Disruptors",
+                        description: "Taken 30 minutes before each dose of antimicrobials, these enzymes may help to break down the protective shields of the bacteria.",
+                    },
+                ]
+            },
+            {
+                phase: "Phase 2: Dietary Management",
+                steps: [
+                    {
+                        title: "Low FODMAP Diet",
+                        description: "Strictly adhere to a diet low in Fermentable Oligosaccharides, Disaccharides, Monosaccharides, and Polyols to reduce the food source for the bacteria.",
+                    }
+                ]
+            },
+            {
+                phase: "Phase 3: Prevention and Gut Healing (Ongoing)",
+                steps: [
+                    {
+                        title: "Prokinetics",
+                        description: "To stimulate the migrating motor complex (MMC). Options include ginger & artichoke extract or prescription medications.",
+                    },
+                    {
+                        title: "Stomach Acid and Digestive Enzymes",
+                        description: "Supplementing with Betaine HCl with meals to ensure proper protein digestion.",
+                    },
+                    {
+                        title: "Gradual Food Reintroduction",
+                        description: "Slowly and systematically reintroduce FODMAP foods to identify personal triggers.",
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        id: 3,
+        title: "The Elemental Diet",
+        summary: "A more intensive, short-term approach that involves consuming a liquid-only diet of pre-digested nutrients to starve bacteria while nourishing the individual.",
+        evidenceTier: 2,
+        commonSymptoms: ["Severe/Stubborn Cases", "High Gas Levels", "Multiple Food Intolerances", "Need for a Gut Reset"],
+        citation: {
+            text: "A pilot study from 2004 showing an 80% success rate in normalizing SIBO breath tests after a 14-day elemental diet.",
+            url: "https://pubmed.ncbi.nlm.nih.gov/14992438/"
+        },
+        sampleDay: {
+            title: "A Sample Day During the Elemental Diet",
+            schedule: [
+                { time: "Throughout the Day", action: "Sip the elemental formula slowly and continuously. Aim to consume the total daily amount spread out over many hours. No other food or drink is consumed except for water." },
+                { time: "Flavoring", action: "If flavor is needed, only use a small amount of pure stevia or monk fruit extract. Avoid any other additives." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: The Elemental Diet (14-21 days)",
+                steps: [
+                    { title: "Exclusive Consumption", description: "For the entire duration, only the elemental formula and water are consumed. No other food, drink, or supplements are taken unless specified by a healthcare provider." },
+                    { title: "Formula Options", description: "Both commercially available formulas and homemade versions exist. It is crucial that the formula contains amino acids, simple carbohydrates, and fats in an easily absorbable form." }
+                ]
+            },
+            {
+                phase: "Phase 2: Reintroduction of Food (Slow and Careful)",
+                steps: [
+                    { title: "Day 1 Post-Diet", description: "Begin with well-cooked, single-ingredient, low-FODMAP foods in small portions (e.g., steamed carrots, plain chicken broth)." },
+                    { title: "Subsequent Days", description: "Slowly introduce one new, simple food each day, monitoring closely for any reaction." }
+                ]
+            },
+            {
+                phase: "Phase 3: Long-Term Prevention (Ongoing)",
+                steps: [
+                    { title: "Dietary Strategy", description: "Continue with a modified diet based on the successful reintroduction of foods, paying close attention to personal triggers." },
+                    { title: "Prokinetics and Gut Support", description: "Implementing prokinetics and other gut-healing strategies is essential to prevent a recurrence." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 8,
+        title: "Atrantil & Berberine Complex Protocol",
+        summary: "A user-reported protocol for high methane SIBO (IMO) using a slow titration of Atrantil and a specific Berberine Complex, combined with motility support.",
+        evidenceTier: 3,
+        commonSymptoms: ["High Methane SIBO (IMO)", "Chronic Constipation", "Bloating", "Candida Overgrowth"],
+        citation: {
+            text: "This is a detailed success story shared by a user on Reddit. The specific combination and titration schedule are anecdotal.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day on the Atrantil & Berberine Protocol",
+            schedule: [
+                { time: "Morning", action: "Take current dose of Atrantil and Berberine Complex with a low-FODMAP/Candida diet breakfast. (e.g., start with 1 pill of each)." },
+                { time: "During Day", action: "Take motility medications as prescribed (e.g., Motegrity, Amitiza). Continue Candida/Low-FODMAP diet." },
+                { time: "Evening", action: "Take final dose of Atrantil and Berberine Complex with dinner." },
+                { time: "Bedtime", action: "Take nightly motility medication on an empty stomach." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Eradication (Slow Titration)",
+                steps: [
+                    { title: "Start Slow", description: "Begin with 1 pill of Atrantil and 1 pill of Integrative Therapeutics Berberine Complex daily." },
+                    { title: "Increase Dosage", description: "Increase dosage slowly every 5-7 days (e.g., to 2 pills of each, then 3, etc.) until reaching the full dosage of 6 pills of each per day." },
+                    { title: "Maintain Full Dosage", description: "Stay at the full dosage for approximately 2.5 months or until bloating resolves." },
+                    { title: "Support Motility", description: "Concurrently manage constipation with motility aids (prescription or OTC like MagO7) as this is a key factor." },
+                    { title: "Diet", description: "Follow a combined Candida Diet and Low FODMAP Diet during treatment." }
+                ]
+            },
+            {
+                phase: "Phase 2: Relapse Prevention (Maintenance)",
+                steps: [
+                    { title: "Taper Down", description: "After symptoms resolve, begin to taper down the dosage. This user took 1 pill of each daily for one year." },
+                    { title: "Further Reduction", description: "Reduce to 1 pill of each every other day for another 8 months before stopping." },
+                    { title: "Long-Term Motility", description: "Continue long-term prescription motility support (e.g., Motegrity, Amitiza) as needed for underlying slow transit." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 4,
+        title: "Probiotic and Prokinetic Protocol",
+        summary: "Emphasizes the combination of a specific probiotic with a prokinetic to manage symptoms and restore gut function, particularly in cases linked to post-infectious IBS.",
+        evidenceTier: 3,
+        commonSymptoms: ["Post-Infectious IBS", "Motility Issues", "Relapse Prevention"],
+        citation: {
+            text: "This protocol is based on a user's experience. While specific probiotics and prokinetics have been studied individually, this particular combination is anecdotal.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day on the Probiotic/Prokinetic Protocol",
+            schedule: [
+                { time: "Morning (with breakfast)", action: "Take one dose of the chosen probiotic (e.g., KefirLabs coconut shot)." },
+                { time: "Between Meals", action: "Maintain meal spacing of 4-5 hours with no snacking to support motility." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., 2mg prucalopride) on an empty stomach, at least 2-3 hours after the last meal." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Daily Regimen (Post-Antibiotic or Maintenance)",
+                steps: [
+                    { title: "Prerequisite", description: "This user began this protocol a couple of weeks after a course of Rifaximin. It may be considered a post-antibiotic or maintenance strategy." },
+                    { title: "Probiotic", description: "One KefirLabs brand coconut creamy probiotic shot taken daily with breakfast." },
+                    { title: "Prokinetic", description: "2mg of prucalopride taken nightly to improve gut motility." },
+                    { title: "Diet", description: "The user reported being able to return to a normal diet with minimal discomfort while on this protocol." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 7,
+        title: "Aggressive Multi-Phase Protocol",
+        summary: "An aggressive protocol for stubborn SIBO. It operates on a multi-pronged, rotational attack using the elemental diet, pharmaceuticals, and herbals to prevent microbial resistance.",
+        evidenceTier: 3,
+        commonSymptoms: ["Stubborn/Recurrent SIBO", "High Methane/Hydrogen Levels", "Biofilm-Related Issues"],
+        citation: {
+            text: "This is a community-derived protocol based on anecdotal reports. It combines several methods (Elemental, Pharmaceutical, Herbal) which have individual scientific backing (see other methods). The combined protocol itself has not been studied.",
+            url: null
+        },
+        sampleDay: {
+            title: "A Sample Day (Example during Herbal Phase)",
+            schedule: [
+                { time: "Morning", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take first dose of herbal antimicrobials with low-FODMAP breakfast." },
+                { time: "Afternoon", action: "Low-FODMAP lunch. Ensure 4-5 hours of spacing between meals to promote MMC." },
+                { time: "Evening", action: "Take biofilm disruptor on empty stomach. 30-60 mins later, take second dose of herbals with low-FODMAP dinner." },
+                { time: "Bedtime", action: "Take prokinetic (e.g., MotilPro) at least 2 hours after dinner." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: 'Shock and Awe' - Elemental Diet (14-21 Days)",
+                steps: [ { title: "Objective & Execution", description: "Commit to a 16-21 day course of an elemental diet formula to starve the microbes. Sip the formula slowly over an hour." } ]
+            },
+            {
+                phase: "Phase 2: The Main Offensive - Rotational Antimicrobials (8-10 weeks)",
+                steps: [
+                    { title: "Round 1 - Pharmaceutical (4 weeks)", description: "Use Rifaximin (Xifaxan), often paired with Neomycin or Metronidazole for methane. Enhance with Partially Hydrolyzed Guar Gum (PHGG)." },
+                    { title: "Round 2 - Herbal (4-6 weeks)", description: "Switch to a broad-spectrum herbal combination like Candibactin-AR/BR or Dysbiocide/FC Cidal." }
+                ]
+            },
+            {
+                phase: "Phase 3: Breaking Down Defenses - Biofilm Disruption",
+                steps: [ { title: "Objective & Execution", description: "Take a biofilm disrupting agent (e.g., Biofilm Defense) 30-60 minutes before each dose of antibiotics or herbs to break down protective shields." } ]
+            },
+            {
+                phase: "Phase 4: Relapse Prevention & Gut Rebuilding (Long-Term)",
+                steps: [
+                    { title: "Prokinetics", description: "Essential for stimulating the MMC. Options include prescription (Motegrity) or herbal (MotilPro, Iberogast)." },
+                    { title: "Dietary Strategy", description: "Meal spacing is crucial (4-5 hours between meals, 12+ hour overnight fast). Start with a SIBO Specific or Low FODMAP diet." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 5,
+        title: "Intestinal Transit & Motility Protocol",
+        summary: "Centers on the core belief that SIBO is fundamentally a problem of slow intestinal transit. The primary goal is to speed up digestion and motility.",
+        evidenceTier: 3,
+        commonSymptoms: ["Chronic Constipation", "Slow Transit Time", "Bloating After Meals"],
+        citation: {
+            text: "This protocol is based on the well-established concept of the Migrating Motor Complex (MMC). While the components (like ginger & artichoke prokinetics) have some studies, this specific comprehensive protocol is anecdotal.",
+            url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3290399/"
+        },
+        sampleDay: {
+            title: "A Sample Day for Improving Motility",
+            schedule: [
+                { time: "Waking Up", action: "Drink a large glass of warm water. Practice deep breathing or vagus nerve stimulation exercises." },
+                { time: "Breakfast", action: "Take Betaine HCL with a protein-rich, low-FODMAP breakfast. Chew every bite thoroughly." },
+                { time: "Between Meals", action: "No snacking. Drink plenty of water. Go for a short walk after meals." },
+                { time: "Bedtime", action: "Take prokinetic (Ginger & Artichoke) on an empty stomach, at least 2-3 hours after your last meal." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: Assessment and Monitoring",
+                steps: [
+                    { title: "Bowel Transit Time Test", description: "Perform an at-home transit test (e.g., using sesame seeds) to measure how long it takes for food to pass through your system." },
+                    { title: "Symptom & Stool Journal", description: "Keep a detailed log of foods eaten, symptoms experienced, and stool quality to identify patterns and track progress." }
+                ]
+            },
+            {
+                phase: "Phase 2: Improving Motility and Digestion",
+                steps: [
+                    { title: "Prokinetics", description: "A combination of Artichoke and Ginger Extract is taken on an empty stomach to stimulate the MMC." },
+                    { title: "Stomach Acid Support", description: "Use Betaine HCL to increase the acidity of the stomach, aiding in the initial breakdown of food." },
+                ]
+            },
+            {
+                phase: "Phase 3: Stress Management and Vagus Nerve Stimulation",
+                steps: [
+                    { title: "De-Stress Protocol", description: "A consistent routine is crucial. The user recommends daily meditation and yoga." },
+                    { title: "Vagus Nerve Stimulation", description: "Stimulating the vagus nerve is key to improving digestion. Techniques include gratitude, empathy, connecting with nature, deep breathing, singing, and yoga." }
+                ]
+            }
+        ]
+    },
+    {
+        id: 6,
+        title: "Colon Hydrotherapy & Digestive Reset",
+        summary: "Posits that the root cause can be old fecal deposits. The core of the treatment is to physically clean the colon while rebuilding healthy digestive habits.",
+        evidenceTier: 0,
+        commonSymptoms: ["Severe Constipation", "Feeling of 'Fullness' or Blockage", "Systemic Issues"],
+        citation: {
+            text: "There is no peer-reviewed evidence to support colon hydrotherapy as a treatment for SIBO. Major medical institutions like the Mayo Clinic advise that it is unnecessary and carries potential risks.",
+            url: "https://www.mayoclinic.org/healthy-lifestyle/consumer-health/expert-answers/colon-cleansing/faq-20058435"
+        },
+        sampleDay: {
+            title: "A Sample Day for Digestive Reset",
+            schedule: [
+                { time: "Morning", action: "Start the day with 2-3 large glasses of filtered water. Take Betaine HCL with a well-chewed, simple breakfast." },
+                { time: "Throughout Day", action: "Focus on hydration, aiming for 2-3 liters of water. Avoid snacking. Eat slowly and mindfully." },
+                { time: "Evening", action: "Take TUDCA or Ox Bile with dinner if fats are difficult to digest. Practice relaxation techniques before bed." }
+            ]
+        },
+        protocol: [
+            {
+                phase: "Phase 1: The 'Clean Out' (Use with Caution)",
+                steps: [
+                    { title: "Colon Hydrotherapy", description: "This user reported success with 3 sessions. This therapy is not supported by scientific evidence for SIBO and should be discussed with a medical professional due to potential risks." }
+                ]
+            },
+            {
+                phase: "Phase 2: Rebuilding the Digestive Cascade (Ongoing Habits)",
+                steps: [
+                    { title: "Mindful Eating", description: "Chew food ~30 times per bite. Eat slowly and without stress or distractions." },
+                    { title: "Stomach Acid & Bile Support", description: "Use Betaine HCL for stomach acid. Use TUDCA or Ox Bile for bile flow. Quit alcohol and junk food." },
+                    { title: "Hydration", description: "Drink 2-3 Liters of filtered water daily." },
+                ]
+            },
+        ]
+    },
 ];
 
-// ---------------- Helper Components ----------------
 const ThumbsUpIcon = ({ isSelected }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z" />
@@ -160,123 +456,10 @@ const EvidenceTierExplanation = () => {
 const AiPatternAnalysis = () => {
     const patterns = [
         { title: 'Two-Phase Strategy: Eradicate then Prevent', description: "Nearly all successful protocols involve an initial 'kill phase' (using antibiotics, herbals, or an elemental diet) followed by a crucial long-term 'prevention phase' to stop SIBO from returning." },
-        { title: 'Motility is King: The Prokinetic Pattern', description: 'Restoring the gut\'s natural cleansing wave (the Migrating Motor Complex or MMC) is the most consistent theme. Prokinetics like ginger & artichoke or prescription options are key for long-term success.' },
+        { title: 'Motility is King: The Prokinetic Pattern', description: "Restoring the gut's natural cleansing wave (the Migrating Motor Complex or MMC) is the most consistent theme. Prokinetics like ginger & artichoke or prescription options are key for long-term success." },
         { title: "The 'Top-Down' Approach: Supporting the Full System", description: 'Many methods recognize SIBO as a symptom of a larger digestive issue. Supporting stomach acid (Betaine HCL) and bile flow ensures food is properly broken down before it can feed an overgrowth.' },
-        { title: 'Strategic Use of Diet', description: 'Diet (like Low FODMAP) is used as a temporary tool to manage symptoms and support the kill phase, not as a standalone cure. Meal spacing (4-5 hours between meals) is also emphasized to allow the MMC to work.' },
-    ];
-
-    return (
-        <div className="max-w-4xl mx-auto mt-16 rounded-xl border border-indigo-200 bg-indigo-50 p-6 shadow-md">
-            <h2 className="text-center text-2xl font-bold text-indigo-800">AI Pattern Analysis: Common Themes in SIBO Recovery</h2>
-            <ul className="mt-6 space-y-4">
-                {patterns.map((pattern) => (
-                    <li key={pattern.title} className="flex items-start">
-                        <svg className="mr-3 mt-1 h-6 w-6 flex-shrink-0 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                        <div>
-                            <h4 className="font-semibold text-indigo-700">{pattern.title}</h4>
-                            <p className="text-sm text-indigo-600">{pattern.description}</p>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-};
-
-const AudioSection = () => {
-    return (
-        <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">SIBO Educational Podcast</h2>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">SIBO Unpacked: Your Gut Detective Guide</h3>
-                <p className="text-gray-600 mb-4">
-                    Listen to this AI-generated podcast discussing Small Intestinal Bacterial Overgrowth, its causes, symptoms, and personalized healing approaches.
-                </p>
-                <audio 
-                    controls 
-                    className="w-full"
-                    preload="metadata"
-                >
-                    <source src="https://firebasestorage.googleapis.com/v0/b/sibo-recovery-app.firebasestorage.app/o/SIBO%20Unpacked_%20Your%20Gut%20Detective%20Guide%20to%20Bloating%2C%20Pain%2C%20and%20Personalized%20Healing.mp3?alt=media&token=136277f0-b710-4f2c-91d2-5b889ca1b4e8" type="audio/mpeg" />
-                    Your browser does not support the audio element.
-                </audio>
-                <p className="text-xs text-gray-500 mt-2">
-                    Note: This content is AI-generated for educational purposes. Always consult healthcare professionals for medical advice.
-                </p>
-            </div>
-        </div>
-    );
-};
-
-// ---------------- Header (Auth) ----------------
-const Header = ({ user, onGoHome, onSubmitMethod, onFeedback }) => {
-    const handleLogin = async () => {
-        if (!auth || !googleProvider) return;
-        try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (error) {
-            console.error('Google sign-in failed:', error);
-            if (error.code === 'auth/popup-closed-by-user') {
-                console.log('Sign-in popup was closed by user');
-            } else if (error.code === 'auth/popup-blocked') {
-                alert('Pop-up was blocked. Please allow pop-ups for this site and try again.');
-            } else {
-                alert('Sign-in failed. Please try again.');
-            }
-        }
-    };
-    
-    return (
-        <header className="flex items-center justify-between bg-white p-4 shadow-sm">
-            <button onClick={onGoHome} className="text-xl font-bold text-gray-800">
-                SIBO Recovery Hub
-            </button>
-            <div className="flex items-center space-x-4">
-                <button onClick={onSubmitMethod} className="font-semibold text-green-600 hover:text-green-800">
-                    Submit a Method
-                </button>
-                <button onClick={onFeedback} className="font-semibold text-purple-600 hover:text-purple-800">
-                    Feedback
-                </button>
-                {user ? (
-                    <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                            {user.photoURL && (
-                                <img 
-                                    src={user.photoURL} 
-                                    alt="Profile" 
-                                    className="w-8 h-8 rounded-full"
-                                />
-                            )}
-                            <span className="hidden text-sm text-gray-600 sm:inline">
-                                Welcome, {user.displayName || `User ${user.uid.substring(0, 6)}...`}
-                            </span>
-                        </div>
-                        <button onClick={() => auth && signOut(auth)} className="font-semibold text-red-600 hover:text-red-800">
-                            Sign Out
-                        </button>
-                    </div>
-                ) : (
-                    <button 
-                        onClick={handleLogin} 
-                        className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                    >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        Sign in with Google
-                    </button>
-                )}
-            </div>
-        </header>
-    );
-};
-
+        { title: 'Strategic Use of Diet', description: 'Diet (like Low FODMAP)
+```javascript
 // ---------------- Main UI ----------------
 const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
     <div
@@ -394,7 +577,7 @@ const MethodDetailPage = ({ method, onBack, user }) => (
             </div>
             <p className="text-sm">{method.citation.text}</p>
             {method.citation.url && (
-                <a
+                
                     href={method.citation.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -463,13 +646,10 @@ const MethodDetailPage = ({ method, onBack, user }) => (
     </div>
 );
 
-// ---------------- Comments ----------------
 const CommentsSection = ({ methodId, user }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [error, setError] = useState(null);
-    const [commentVotes, setCommentVotes] = useState({});
-    const [userCommentVotes, setUserCommentVotes] = useState({});
 
     useEffect(() => {
         if (!db) return;
@@ -479,17 +659,6 @@ const CommentsSection = ({ methodId, user }) => {
             (snapshot) => {
                 const fetched = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
                 setComments(fetched);
-                // Fetch vote counts for each comment
-                const votes = {};
-                fetched.forEach(comment => {
-                    const voteDocRef = doc(db, `methods/${methodId}/comments/${comment.id}/votes/${comment.id}`);
-                    onSnapshot(voteDocRef, (voteSnap) => {
-                        if (voteSnap.exists()) {
-                            votes[comment.id] = voteSnap.data();
-                            setCommentVotes({ ...votes });
-                        }
-                    });
-                });
             },
             (err) => {
                 console.error('Error fetching comments:', err);
@@ -498,76 +667,6 @@ const CommentsSection = ({ methodId, user }) => {
         );
         return () => unsubscribe();
     }, [methodId]);
-
-    // Track user's votes on comments
-    useEffect(() => {
-        if (user && db) {
-            const userVotesQuery = collection(db, `users/${user.uid}/commentVotes`);
-            const unsubscribe = onSnapshot(userVotesQuery, (snapshot) => {
-                const votes = {};
-                snapshot.forEach((doc) => {
-                    votes[doc.id] = doc.data().vote;
-                });
-                setUserCommentVotes(votes);
-            });
-            return () => unsubscribe();
-        } else {
-            setUserCommentVotes({});
-        }
-    }, [user, methodId]);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!newComment.trim() || !user || !db) return;
-        try {
-            await addDoc(collection(db, `methods/${methodId}/comments`), {
-                text: newComment,
-                userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
-                userId: user.uid,
-                timestamp: serverTimestamp(),
-            });
-            setNewComment('');
-            setError(null);
-        } catch (err) {
-            console.error('Error posting comment:', err);
-            setError('Failed to post comment. Please make sure you are signed in.');
-        }
-    };
-
-    const handleCommentVote = async (commentId, voteType) => {
-        if (!user || !db) {
-            setError('Please sign in to vote');
-            return;
-        }
-        const voteDocRef = doc(db, `methods/${methodId}/comments/${commentId}/votes/${commentId}`);
-        const userVoteRef = doc(db, `users/${user.uid}/commentVotes/${commentId}`);
-        try {
-            await runTransaction(db, async (transaction) => {
-                const voteDoc = await transaction.get(voteDocRef);
-                const userVoteDoc = await transaction.get(userVoteRef);
-                let likes = voteDoc.exists() ? voteDoc.data().likes || 0 : 0;
-                let dislikes = voteDoc.exists() ? voteDoc.data().dislikes || 0 : 0;
-                const previousVote = userVoteDoc.exists() ? userVoteDoc.data().vote : null;
-
-                // Remove previous vote
-                if (previousVote === 'like') likes = Math.max(0, likes - 1);
-                if (previousVote === 'dislike') dislikes = Math.max(0, dislikes - 1);
-
-                // Add new vote (toggle off if same vote)
-                if (voteType !== previousVote) {
-                    if (voteType === 'like') likes++;
-                    if (voteType === 'dislike') dislikes++;
-                    transaction.set(userVoteRef, { vote: voteType, methodId, commentId });
-                } else {
-                    transaction.delete(userVoteRef);
-                }
-                transaction.set(voteDocRef, { likes, dislikes }, { merge: true });
-            });
-        } catch (err) {
-            console.error('Error voting on comment:', err);
-            setError('Failed to record vote');
-        }
-    };
 
     const handleGoogleSignIn = async () => {
         if (!auth) return;
@@ -584,6 +683,24 @@ const CommentsSection = ({ methodId, user }) => {
             }
         }
     };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim() || !user || !db) return;
+        try {
+            await addDoc(collection(db, `methods/${methodId}/comments`), {
+                text: newComment,
+                userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
+                userId: user.uid,
+                timestamp: serverTimestamp(),
+            });
+            setNewComment('');
+        } catch (err) {
+            console.error('Error posting comment:', err);
+            setError('Failed to post comment. Please make sure you are signed in.');
+        }
+    };
+    
     return (
         <div className="mt-12">
             <h2 className="mb-6 text-2xl font-bold text-gray-800">Community Discussion</h2>
@@ -619,43 +736,15 @@ const CommentsSection = ({ methodId, user }) => {
                 {error && <p className="mb-4 text-red-500">{error}</p>}
                 <div className="space-y-6">
                     {comments.length > 0 ? (
-                        comments.map((c) => {
-                            const votes = commentVotes[c.id] || { likes: 0, dislikes: 0 };
-                            const userVote = userCommentVotes[c.id];
-                            return (
-                                <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <p className="font-semibold text-gray-800">{c.userName}</p>
-                                            <p className="mb-2 text-xs text-gray-500">
-                                                {c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
-                                            </p>
-                                            <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-2 ml-4">
-                                            <button
-                                                onClick={() => handleCommentVote(c.id, 'like')}
-                                                className={`flex items-center space-x-1 transition-colors ${
-                                                    userVote === 'like' ? 'text-green-600' : 'text-gray-500 hover:text-green-600'
-                                                }`}
-                                            >
-                                                <ThumbsUpIcon isSelected={userVote === 'like'} />
-                                                <span className="text-sm font-semibold">{votes.likes}</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleCommentVote(c.id, 'dislike')}
-                                                className={`flex items-center space-x-1 transition-colors ${
-                                                    userVote === 'dislike' ? 'text-red-600' : 'text-gray-500 hover:text-red-600'
-                                                }`}
-                                            >
-                                                <ThumbsDownIcon isSelected={userVote === 'dislike'} />
-                                                <span className="text-sm font-semibold">{votes.dislikes}</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
+                        comments.map((c) => (
+                            <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
+                                <p className="font-semibold text-gray-800">{c.userName}</p>
+                                <p className="mb-2 text-xs text-gray-500">
+                                    {c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
+                                </p>
+                                <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
+                            </div>
+                        ))
                     ) : (
                         <p className="text-gray-500">No comments yet. Be the first to share your experience!</p>
                     )}
@@ -665,7 +754,6 @@ const CommentsSection = ({ methodId, user }) => {
     );
 };
 
-// ---------------- Submit Method ----------------
 const SubmitMethodPage = ({ onBack, user }) => {
     const [formData, setFormData] = useState({ title: '', summary: '', sourceLink: '', symptoms: '', protocol: '', sampleDay: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -764,7 +852,6 @@ const SubmitMethodPage = ({ onBack, user }) => {
     );
 };
 
-// ---------------- Feedback ----------------
 const FeedbackPage = ({ onBack, user }) => {
     const [feedback, setFeedback] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -844,7 +931,6 @@ const FeedbackPage = ({ onBack, user }) => {
     );
 };
 
-// ---------------- Gemini Advisor ----------------
 const GeminiAdvisor = ({ methods, onClose }) => {
     const allSymptoms = [...new Set(methods.flatMap((m) => m.commonSymptoms || []))];
     const [selectedSymptoms, setSelectedSymptoms] = useState([]);
@@ -917,7 +1003,7 @@ const GeminiAdvisor = ({ methods, onClose }) => {
                                     selectedSymptoms.includes(sym)
                                         ? 'border-indigo-600 bg-indigo-600 text-white'
                                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
-                                }`}
+										           }`}
                             >
                                 {sym}
                             </button>
@@ -944,8 +1030,7 @@ const GeminiAdvisor = ({ methods, onClose }) => {
     );
 };
 
-// ---------------- App ----------------
-const App = () => {
+function App() {
     const [currentPage, setCurrentPage] = useState('list');
     const [selectedMethodId, setSelectedMethodId] = useState(null);
     const [votes, setVotes] = useState({});
@@ -953,9 +1038,8 @@ const App = () => {
     const [user, setUser] = useState(null);
     const [authReady, setAuthReady] = useState(false);
     const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
-    const [sortOrder, setSortOrder] = useState('evidence'); // 'evidence' | 'likes'
+    const [sortOrder, setSortOrder] = useState('evidence');
 
-    // Auth
     useEffect(() => {
         if (!auth) {
             setAuthReady(true);
@@ -969,7 +1053,6 @@ const App = () => {
         return () => unsub();
     }, []);
 
-    // Aggregate votes (per method id)
     useEffect(() => {
         if (!db) return;
         const votesCollection = collection(db, 'votes');
@@ -984,7 +1067,6 @@ const App = () => {
         return () => unsub();
     }, []);
 
-    // Current user's votes
     useEffect(() => {
         if (user && db) {
             const userId = user.uid;
@@ -1014,7 +1096,6 @@ const App = () => {
     const handleSubmitMethod = () => setCurrentPage('submit');
     const handleFeedback = () => setCurrentPage('feedback');
 
-    // Voting with transaction
     const handleVote = async (id, voteType) => {
         if (!auth || !db) return;
         let currentUser = auth.currentUser;
@@ -1065,7 +1146,6 @@ const App = () => {
         }
     };
     
-    // Sort methods based on user selection
     const sortedMethods = [...siboMethodsData].sort((a, b) => {
         if (sortOrder === 'likes') {
             const likesA = votes[a.id]?.likes || 0;
@@ -1079,7 +1159,6 @@ const App = () => {
 
     const selectedMethod = siboMethodsData.find((m) => m.id === selectedMethodId);
     
-    // Render loading state or error for bad config
     if (!isFirebaseConfigValid()) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
@@ -1100,7 +1179,6 @@ const App = () => {
         );
     }
     
-    // Page router
     const renderPage = () => {
         switch (currentPage) {
             case 'detail':
@@ -1135,4 +1213,3 @@ const App = () => {
 }
 
 export default App;
-
