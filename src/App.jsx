@@ -19,28 +19,26 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 
-// ---------------------------
-// Configuration Handling
-// ---------------------------
-// We will try to read firebase config from a globally injected variable __firebase_config,
-// which could be injected by the hosting environment with special quotes escape in JSON.
-// If it exists, we parse it. Otherwise we read from environment variables.
+/* ---------------------------------------
+   Firebase Configuration Handling
+--------------------------------------- */
 let firebaseConfig;
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
   try {
-    // __firebase_config might be a JSON string with special escaped characters like \" or Unicode escapes
-    // e.g. "{\"apiKey\": \"...\", ...}"
-    // We'll attempt to parse it safely.
-    firebaseConfig = JSON.parse(__firebase_config);
+    firebaseConfig = typeof __firebase_config === 'string'
+      ? JSON.parse(__firebase_config)
+      : __firebase_config;
   } catch (e) {
     console.error('Error parsing __firebase_config:', e);
   }
 }
-
 if (!firebaseConfig) {
-  // Fallback to environment variables if __firebase_config is not provided or parsing fails
   firebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
     authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -50,18 +48,13 @@ if (!firebaseConfig) {
     appId: process.env.REACT_APP_FIREBASE_APP_ID,
   };
 }
-// Set the Gemini API key from env
-const GEMINI_API_KEY = typeof process !== 'undefined' ? process.env.REACT_APP_GEMINI_API_KEY : '';
+const GEMINI_API_KEY =
+  typeof process !== 'undefined' ? process.env.REACT_APP_GEMINI_API_KEY : '';
 
-// Utility to check if firebase config is valid
-const isFirebaseConfigValid = () => {
-  return (
-    firebaseConfig &&
-    Object.values(firebaseConfig).every((value) => value && String(value).trim() !== '')
-  );
-};
+const isFirebaseConfigValid = () =>
+  firebaseConfig &&
+  Object.values(firebaseConfig).every((v) => v && String(v).trim() !== '');
 
-// Initialize Firebase if we have a valid config
 let app = null;
 let db = null;
 let auth = null;
@@ -73,12 +66,14 @@ if (isFirebaseConfigValid()) {
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
 } else {
-  console.error('Firebase configuration is missing or incomplete. Check environment variables.');
+  console.error(
+    'Firebase configuration is missing or incomplete. Check environment variables.'
+  );
 }
 
-// ---------------------------
-// SVG Icons & Utility Components
-// ---------------------------
+/* ---------------------------------------
+   Icons / small components
+--------------------------------------- */
 const ThumbsUpIcon = ({ isSelected }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -113,7 +108,9 @@ const ThumbsDownIcon = ({ isSelected }) => (
   </svg>
 );
 
-// Evidence Tier Badge
+/* ---------------------------------------
+   Evidence badges & explanations
+--------------------------------------- */
 const EvidenceTierBadge = ({ tier }) => {
   const tierData = {
     1: { text: 'Tier 1: Strong Evidence', color: 'bg-green-100 text-green-800' },
@@ -121,44 +118,21 @@ const EvidenceTierBadge = ({ tier }) => {
     3: { text: 'Tier 3: Anecdotal / Case Report', color: 'bg-blue-100 text-blue-800' },
     0: { text: 'Caution: No Evidence / Potential Harm', color: 'bg-red-100 text-red-800' },
   };
-
   const info = tierData[tier] || { text: 'N/A', color: 'bg-gray-100 text-gray-800' };
-
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}
-    >
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}>
       {info.text}
     </span>
   );
 };
 
-// Explanatory Section for Evidence Tiers
 const EvidenceTierExplanation = () => {
   const tiers = [
-    {
-      tier: 1,
-      title: 'Tier 1: Strong Evidence',
-      description:
-        'Backed by higher-quality scientific studies, such as randomized controlled trials.',
-    },
-    {
-      tier: 2,
-      title: 'Tier 2: Promising Evidence',
-      description: 'Supported by pilot or smaller studies; promising but needs more research.',
-    },
-    {
-      tier: 3,
-      title: 'Tier 3: Anecdotal / Case Report',
-      description: 'Primarily based on user experiences or case reports.',
-    },
-    {
-      tier: 0,
-      title: 'Caution: No Evidence / Potential Harm',
-      description: 'No supportive evidence for SIBO and/or potential harm.',
-    },
+    { tier: 1, title: 'Tier 1: Strong Evidence', description: 'Backed by higher-quality studies such as randomized controlled trials.' },
+    { tier: 2, title: 'Tier 2: Promising Evidence', description: 'Supported by pilot or small studies; promising but needs more research.' },
+    { tier: 3, title: 'Tier 3: Anecdotal / Case Report', description: 'Based on user experiences or case reports.' },
+    { tier: 0, title: 'Caution: No Evidence / Potential Harm', description: 'No supportive evidence and/or potential harm.' },
   ];
-
   return (
     <div className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
       <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
@@ -181,9 +155,9 @@ const EvidenceTierExplanation = () => {
   );
 };
 
-// ---------------------------
-// AI Pattern Analysis Section
-// ---------------------------
+/* ---------------------------------------
+   Patterns section
+--------------------------------------- */
 const AiPatternAnalysis = () => {
   const patterns = [
     {
@@ -197,7 +171,7 @@ const AiPatternAnalysis = () => {
         'Supporting the Migrating Motor Complex (MMC) with meal spacing and, where appropriate, prokinetics, is a common pattern.',
     },
     {
-      title: "Top-Down Support",
+      title: 'Top-Down Support',
       description:
         'Some approaches consider upstream digestion support (stomach acid, bile flow) as part of a holistic plan.',
     },
@@ -207,7 +181,6 @@ const AiPatternAnalysis = () => {
         'Diet strategies (e.g., Low FODMAP/SCD) can help manage symptoms during treatment and reintroduction phases.',
     },
   ];
-
   return (
     <section className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
       <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
@@ -224,26 +197,104 @@ const AiPatternAnalysis = () => {
   );
 };
 
-// Stub for future audio player
-const AudioSection = () => null;
+/* ---------------------------------------
+   Audio section (placeholder)
+--------------------------------------- */
+const AudioSection = () => {
+  const episodes = []; // e.g., [{ title: 'Episode 1', src: '/audio/ep1.mp3' }]
+  if (!episodes.length) return null;
+  return (
+    <section className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Audio: Stories & Tips</h2>
+      <ul className="space-y-4">
+        {episodes.map((ep) => (
+          <li key={ep.src} className="p-4 rounded-lg border bg-gray-50">
+            <p className="font-semibold mb-2">{ep.title}</p>
+            <audio controls className="w-full">
+              <source src={ep.src} type="audio/mpeg" />
+            </audio>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
 
-// ---------------------------
-// Data (Methods) — You can extend this list as needed
-// ---------------------------
+/* ---------------------------------------
+   Methods data
+--------------------------------------- */
 const siboMethodsData = [
   {
-    id: 1,
-    title: 'Elemental Diet (short term)',
+    id: 2,
+    title: 'Rifaximin (Pharmaceutical) Protocol',
     summary:
-      'A nutritionally complete liquid formula used short-term under clinical guidance. Often used when other approaches are not tolerated.',
+      'Utilizes the prescription antibiotic Rifaximin as the primary means of eradicating the bacterial overgrowth; may be paired for methane cases.',
     evidenceTier: 1,
+    commonSymptoms: ['Hydrogen-dominant SIBO', 'Diarrhea', 'Bloating', 'Methane SIBO (with pairing)'],
     citation: {
-      text: 'Discuss with a clinician; research exists on short-course elemental diets for SIBO-like symptoms.',
-      url: '',
+      text: '2010 double-blind Rifaximin trial in non-constipation IBS; SIBO overlap.',
+      url: 'https://pubmed.ncbi.nlm.nih.gov/21182358/',
     },
-    commonSymptoms: ['Bloating', 'Abdominal pain', 'Diarrhea'],
     sampleDay: {
-      title: 'Example day (illustrative)',
+      title: 'A Sample Day During the Rifaximin Protocol',
+      schedule: [
+        { time: 'Morning (8 AM)', action: 'Dose with water. Walk 10–15 min. Breakfast 30–60 min later.' },
+        { time: 'Afternoon (2 PM)', action: 'Second dose. Light movement. Balanced lunch.' },
+        { time: 'Evening (8 PM)', action: 'Third dose. Gentle dinner. Journal symptoms.' },
+        { time: 'Bedtime', action: '12-hour overnight fast to support MMC.' },
+      ],
+    },
+    protocol: [
+      {
+        phase: 'Phase 1: Antibiotic Treatment (~14 days)',
+        steps: [
+          { title: 'Hydrogen-dominant', description: 'Rifaximin 550mg, three times daily (per clinician).' },
+          { title: 'Methane-dominant', description: 'Rifaximin + a pairing agent (e.g., Neomycin) per clinician.' },
+          { title: 'Dietary support', description: 'Short-term symptom diet if helpful; hydrate and move gently.' },
+        ],
+      },
+      {
+        phase: 'Phase 2: Recovery & Prevention',
+        steps: [
+          { title: 'Prokinetic support', description: 'Discuss options (ginger, artichoke, Rx) if appropriate.' },
+          { title: 'Meal spacing', description: '3–4+ hours between meals to encourage MMC (as tolerated).' },
+          { title: 'Reintroduction', description: 'Gradual food reintroduction and trigger tracking.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 3,
+    title: 'Herbal Antimicrobials (Combo)',
+    summary:
+      'Botanical protocols in cycles; blends such as berberine, oregano, allicin are commonly used (watch sensitivities).',
+    evidenceTier: 2,
+    commonSymptoms: ['Bloating', 'Gas', 'Abdominal pain'],
+    citation: { text: 'Pilot/smaller studies; consult clinician.', url: '' },
+    sampleDay: {
+      title: 'Illustrative day',
+      schedule: [
+        { time: 'Morning', action: 'Protocol dose with water; breakfast later.' },
+        { time: 'Afternoon', action: 'Second dose; light walk.' },
+        { time: 'Evening', action: 'Wind down; symptom notes.' },
+      ],
+    },
+    protocol: [
+      { phase: 'Phase 1 — Foundation', steps: [{ title: 'Dietary baseline', description: 'Simplify triggers; hydrate.' }] },
+      { phase: 'Phase 2 — Active', steps: [{ title: 'Cycle antimicrobials', description: 'Follow cycle plan; track symptoms.' }] },
+      { phase: 'Phase 3 — Maintenance', steps: [{ title: 'Reassess', description: 'Evaluate and plan next steps.' }] },
+    ],
+  },
+  {
+    id: 4,
+    title: 'Elemental Diet (Short Course, supervised)',
+    summary:
+      'Nutritionally complete formula used short-term when other approaches are not tolerated.',
+    evidenceTier: 1,
+    commonSymptoms: ['Bloating', 'Abdominal pain', 'Diarrhea'],
+    citation: { text: 'Discuss with clinician; evidence for symptom improvement in some cohorts.', url: '' },
+    sampleDay: {
+      title: 'Illustrative day',
       schedule: [
         { time: 'Morning', action: 'Prepared formula, hydration, gentle movement' },
         { time: 'Midday', action: 'Formula portion, rest, light activity' },
@@ -251,168 +302,42 @@ const siboMethodsData = [
       ],
     },
     protocol: [
-      {
-        phase: 'Phase 1 — Preparation',
-        steps: [
-          { title: 'Overview', description: 'Set expectations, plan duration with clinician.' },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Active',
-        steps: [
-          { title: 'Follow schedule', description: 'Use formula per plan; monitor tolerance.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Reintroduction',
-        steps: [
-          {
-            title: 'Gradual foods',
-            description: 'Reintroduce foods methodically while tracking symptoms.',
-          },
-        ],
-      },
+      { phase: 'Phase 1 — Preparation', steps: [{ title: 'Overview', description: 'Plan duration with clinician.' }] },
+      { phase: 'Phase 2 — Active', steps: [{ title: 'Follow schedule', description: 'Use formula per plan; monitor.' }] },
+      { phase: 'Phase 3 — Reintroduction', steps: [{ title: 'Gradual foods', description: 'Reintroduce while tracking.' }] },
     ],
   },
   {
-    id: 2,
-    title: 'Herbal Antimicrobials (combo)',
-    summary:
-      'Botanical protocols used in cycles; commonly referenced blends combine multiple herbs.',
-    evidenceTier: 2,
-    citation: {
-      text: 'Pilot/smaller studies exist; quality varies. Use with professional guidance.',
-      url: '',
-    },
-    commonSymptoms: ['Bloating', 'Gas', 'Abdominal pain'],
-    sampleDay: {
-      title: 'Example day (illustrative)',
-      schedule: [
-        { time: 'Morning', action: 'Protocol dose with water; breakfast later' },
-        { time: 'Afternoon', action: 'Second dose; light walk' },
-        { time: 'Evening', action: 'Wind down; symptom notes' },
-      ],
-    },
-    protocol: [
-      {
-        phase: 'Phase 1 — Foundation',
-        steps: [
-          { title: 'Dietary baseline', description: 'Simplify triggers; ensure hydration.' },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Active',
-        steps: [
-          { title: 'Cycle antimicrobials', description: 'Follow cycle plan with breaks; track symptoms.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Maintenance',
-        steps: [
-          { title: 'Reassess', description: 'Evaluate changes; discuss next steps with clinician.' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: 'Antibiotics (clinician-directed)',
-    summary:
-      'Prescription options may be used based on testing and clinical assessment.',
-    evidenceTier: 1,
-    citation: {
-      text: 'Talk to a licensed clinician. Evidence differs by presentation and testing.',
-      url: '',
-    },
-    commonSymptoms: ['Bloating', 'Diarrhea', 'Constipation'],
-    sampleDay: {
-      title: 'Example day (illustrative)',
-      schedule: [
-        { time: 'Morning', action: 'Medication as prescribed' },
-        { time: 'Midday', action: 'Hydration and balanced meals' },
-        { time: 'Evening', action: 'Follow-up notes for clinician' },
-      ],
-    },
-    protocol: [
-      {
-        phase: 'Phase 1 — Evaluation',
-        steps: [
-          { title: 'Testing & plan', description: 'Clinician evaluation; shared decision-making.' },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Treatment',
-        steps: [
-          { title: 'Adherence', description: 'Take medicine exactly as prescribed.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Follow-up',
-        steps: [
-          { title: 'Review', description: 'Assess response and next steps with clinician.' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 4,
+    id: 5,
     title: 'Prokinetic & Meal Spacing',
-    summary:
-      'Focuses on gut motility support and spacing meals to support the MMC.',
+    summary: 'Focus on motility support and spacing meals to support MMC.',
     evidenceTier: 2,
-    citation: {
-      text: 'Physiology-informed strategies; evidence varies by agent.',
-      url: '',
-    },
     commonSymptoms: ['Bloating', 'Fullness', 'Constipation'],
+    citation: { text: 'Physiology-informed strategy; agent-specific evidence varies.', url: '' },
     sampleDay: {
-      title: 'Example day (illustrative)',
+      title: 'Illustrative day',
       schedule: [
-        {
-          time: 'Morning',
-          action: 'Balanced breakfast; space next meal ~4+ hrs if appropriate',
-        },
+        { time: 'Morning', action: 'Balanced breakfast; space next meal ~4+ hrs if appropriate' },
         { time: 'Afternoon', action: 'Light movement; hydration' },
         { time: 'Evening', action: 'Dinner; wind down; sleep hygiene' },
       ],
     },
     protocol: [
-      {
-        phase: 'Phase 1 — Baseline',
-        steps: [
-          {
-            title: 'Spacing',
-            description: 'Aim for meal spacing to support MMC (as tolerated).',
-          },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Support',
-        steps: [
-          { title: 'Prokinetic', description: 'Discuss options with clinician if appropriate.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Review',
-        steps: [
-          { title: 'Reassess', description: 'Fine-tune with professional support if needed.' },
-        ],
-      },
+      { phase: 'Phase 1 — Baseline', steps: [{ title: 'Spacing', description: 'Aim for meal spacing (as tolerated).' }] },
+      { phase: 'Phase 2 — Support', steps: [{ title: 'Prokinetic', description: 'Discuss options with clinician.' }] },
+      { phase: 'Phase 3 — Review', steps: [{ title: 'Reassess', description: 'Fine-tune with support as needed.' }] },
     ],
   },
   {
-    id: 5,
-    title: 'Low-FODMAP (short-term symptom management)',
+    id: 6,
+    title: 'Low-FODMAP (Short-term symptom management)',
     summary:
-      'Structured elimination/reintroduction to identify triggers and manage symptoms short term.',
+      'Structured elimination/reintroduction to identify triggers; short-term symptom tool.',
     evidenceTier: 2,
-    citation: {
-      text: 'Research for IBS symptom management exists; adapt with clinician for SIBO context.',
-      url: '',
-    },
     commonSymptoms: ['Bloating', 'Gas', 'Abdominal pain'],
+    citation: { text: 'IBS symptom research; adapt for SIBO context with clinician.', url: '' },
     sampleDay: {
-      title: 'Example day (illustrative)',
+      title: 'Illustrative day',
       schedule: [
         { time: 'Morning', action: 'Low-FODMAP breakfast' },
         { time: 'Afternoon', action: 'Hydration; walk' },
@@ -420,40 +345,21 @@ const siboMethodsData = [
       ],
     },
     protocol: [
-      {
-        phase: 'Phase 1 — Elimination',
-        steps: [
-          { title: 'Short-term plan', description: 'Limit high-FODMAP foods briefly.' },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Reintroduction',
-        steps: [
-          { title: 'Systematic testing', description: 'Reintroduce groups one at a time.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Personalization',
-        steps: [
-          {
-            title: 'Sustain',
-            description:
-              'Build a long-term, diverse diet based on findings.',
-          },
-        ],
-      },
+      { phase: 'Phase 1 — Elimination', steps: [{ title: 'Short-term plan', description: 'Limit high-FODMAP foods briefly.' }] },
+      { phase: 'Phase 2 — Reintroduction', steps: [{ title: 'Systematic testing', description: 'Reintroduce groups one at a time.' }] },
+      { phase: 'Phase 3 — Personalization', steps: [{ title: 'Sustain', description: 'Build a long-term, diverse diet.' }] },
     ],
   },
   {
-    id: 6,
+    id: 7,
     title: 'Stress, Sleep, and Movement Support',
     summary:
-      'Lifestyle pillars that often influence GI symptoms: stress reduction, sleep quality, and gentle movement.',
+      'Lifestyle pillars that influence GI symptoms: stress reduction, sleep quality, and gentle movement.',
     evidenceTier: 3,
-    citation: { text: 'Broad health literature supports these areas; specifics vary.', url: '' },
     commonSymptoms: ['Abdominal pain', 'Bloating', 'General wellbeing'],
+    citation: { text: 'Broad health literature supports these areas; specifics vary.', url: '' },
     sampleDay: {
-      title: 'Example day (illustrative)',
+      title: 'Illustrative day',
       schedule: [
         { time: 'Morning', action: 'Light movement or walk' },
         { time: 'Afternoon', action: 'Short stress-reduction session' },
@@ -461,31 +367,16 @@ const siboMethodsData = [
       ],
     },
     protocol: [
-      {
-        phase: 'Phase 1 — Assess',
-        steps: [
-          { title: 'Identify habits', description: 'Note stressors and sleep patterns.' },
-        ],
-      },
-      {
-        phase: 'Phase 2 — Build',
-        steps: [
-          { title: 'Small changes', description: 'Add gentle, realistic daily habits.' },
-        ],
-      },
-      {
-        phase: 'Phase 3 — Maintain',
-        steps: [
-          { title: 'Track & adjust', description: 'Iterate based on what helps.' },
-        ],
-      },
+      { phase: 'Phase 1 — Assess', steps: [{ title: 'Identify habits', description: 'Note stressors and sleep patterns.' }] },
+      { phase: 'Phase 2 — Build', steps: [{ title: 'Small changes', description: 'Add gentle daily habits.' }] },
+      { phase: 'Phase 3 — Maintain', steps: [{ title: 'Track & adjust', description: 'Iterate based on what helps.' }] },
     ],
   },
 ];
 
-// ---------------------------
-// Header Component
-// ---------------------------
+/* ---------------------------------------
+   Header
+--------------------------------------- */
 function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
   const [busy, setBusy] = useState(false);
 
@@ -558,9 +449,9 @@ function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
   );
 }
 
-// ---------------------------
-// Cards & Pages
-// ---------------------------
+/* ---------------------------------------
+   Cards & List page
+--------------------------------------- */
 const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
   <div
     className="flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-transform hover:-translate-y-1"
@@ -617,7 +508,8 @@ const MethodListPage = ({
         Community-Sourced SIBO Protocols
       </h1>
       <p className="mx-auto mt-4 max-w-3xl text-lg text-gray-600">
-        Explore recovery methods backed by community experience and general evidence summaries. Vote on what you\'ve tried and see what has worked for others.
+        Explore recovery methods backed by community experience and general evidence summaries. Vote on what you've
+        tried and see what has worked for others.
       </p>
       <button
         onClick={onOpenAdvisor}
@@ -656,14 +548,17 @@ const MethodListPage = ({
 
     <footer className="mt-12 px-4 text-center text-sm text-gray-500">
       <p>
-        This site is for educational purposes only and is not medical advice. Always
-        consult a qualified healthcare professional.
+        This site is for educational purposes only and is not medical advice. Always consult a qualified healthcare
+        professional.
       </p>
     </footer>
   </div>
 );
 
-const MethodDetailPage = ({ method, onBack, user }) => (
+/* ---------------------------------------
+   Detail page
+--------------------------------------- */
+const MethodDetailPage = ({ method, onBack, user, isAdmin }) => (
   <div className="mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
     <button
       onClick={onBack}
@@ -767,70 +662,107 @@ const MethodDetailPage = ({ method, onBack, user }) => (
       ))}
     </div>
 
-    <CommentsSection methodId={method.id} user={user} />
+    <CommentsSection methodId={method.id} user={user} isAdmin={isAdmin} />
   </div>
 );
 
-function CommentsSection({ methodId, user }) {
+/* ---------------------------------------
+   NICKNAMES helpers
+--------------------------------------- */
+const ADJECTIVES = ['Calm','Brave','Swift','Sunny','Kind','Bright','Lucky','Quiet','Clever','Silver'];
+const ANIMALS    = ['Otter','Falcon','Panda','Koala','Fox','Dolphin','Lynx','Finch','Turtle','Bear'];
+
+function generateNickname(uid = '') {
+  const a = ADJECTIVES[Math.floor(Math.random()*ADJECTIVES.length)];
+  const b = ANIMALS[Math.floor(Math.random()*ANIMALS.length)];
+  const tag = uid.slice(-4) || String(Math.floor(Math.random()*9999)).padStart(4,'0');
+  return `${a} ${b} #${tag}`;
+}
+
+async function getOrCreateNickname(db, uid) {
+  const uref = doc(db, 'users', uid);
+  const snap = await getDoc(uref);
+  if (snap.exists() && snap.data()?.nickname) return snap.data().nickname;
+  const nickname = generateNickname(uid);
+  await setDoc(uref, { nickname }, { merge: true });
+  return nickname;
+}
+
+/* ---------------------------------------
+   Comments (pseudonyms + edit/delete + admin delete)
+--------------------------------------- */
+function CommentsSection({ methodId, user, isAdmin }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [error, setError] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
 
   useEffect(() => {
     if (!db) return;
-    const commentsQuery = query(
-      collection(db, `methods/${methodId}/comments`),
-      orderBy('timestamp', 'desc')
+    const qref = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
+    const unsub = onSnapshot(
+      qref,
+      (snap) => setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), 
+      (err) => { console.error(err); setError('Could not load comments.'); }
     );
-
-    const unsubscribe = onSnapshot(
-      commentsQuery,
-      (snapshot) => {
-        const fetched = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setComments(fetched);
-      },
-      (err) => {
-        console.error('Error fetching comments:', err);
-        setError('Could not load comments. Please try again later.');
-      }
-    );
-
-    return () => unsubscribe();
+    return () => unsub();
   }, [methodId]);
 
   const handleGoogleSignIn = async () => {
     if (!auth) return;
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Google sign-in failed:', error);
-      try {
-        await signInAnonymously(auth);
-      } catch (anonError) {
-        console.error('Sign-in failed:', anonError);
-        setError('Failed to sign in. Please try again.');
-      }
-    }
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (e) { console.error(e); try { await signInAnonymously(auth);} catch {} }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !user || !db) return;
-
     try {
+      const nickname = await getOrCreateNickname(db, user.uid);
       await addDoc(collection(db, `methods/${methodId}/comments`), {
-        text: newComment,
-        userName: user.displayName || `User ${user.uid.substring(0, 6)}...`,
+        text: newComment.trim(),
+        nickname,
         userId: user.uid,
         timestamp: serverTimestamp(),
       });
       setNewComment('');
     } catch (err) {
-      console.error('Error posting comment:', err);
-      setError('Failed to post comment. Please make sure you are signed in.');
+      console.error(err);
+      setError('Failed to post comment. Please try again.');
     }
   };
+
+  const startEdit = (c) => { setEditingId(c.id); setEditText(c.text); };
+  const cancelEdit = () => { setEditingId(null); setEditText(''); };
+
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    try {
+      await updateDoc(doc(db, `methods/${methodId}/comments`, editingId), {
+        text: editText.trim(),
+        editedAt: serverTimestamp(),
+      });
+      cancelEdit();
+    } catch (e) {
+      console.error(e);
+      setError('Failed to save changes.');
+    }
+  };
+
+  const remove = async (id) => {
+    if (!user) return;
+    if (!window.confirm('Delete this comment?')) return;
+    try {
+      await deleteDoc(doc(db, `methods/${methodId}/comments`, id));
+    } catch (e) {
+      console.error(e);
+      setError('Failed to delete comment.');
+    }
+  };
+
+  const canEdit = (c) => user && c.userId === user.uid;
+  const canDelete = (c) => (user && c.userId === user.uid) || isAdmin;
 
   return (
     <div className="mt-12">
@@ -847,7 +779,7 @@ function CommentsSection({ methodId, user }) {
             />
             <button
               type="submit"
-              className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400"
+              className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:bg-gray-400"
               disabled={!newComment.trim()}
             >
               Post Comment
@@ -857,10 +789,7 @@ function CommentsSection({ methodId, user }) {
           <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-4 text-center">
             <p className="text-gray-600">
               Want to share your experience?{' '}
-              <button
-                onClick={handleGoogleSignIn}
-                className="font-semibold text-blue-600 hover:underline"
-              >
+              <button onClick={handleGoogleSignIn} className="font-semibold text-blue-600 hover:underline">
                 Sign in with Google
               </button>{' '}
               to join the discussion.
@@ -874,13 +803,46 @@ function CommentsSection({ methodId, user }) {
           {comments.length > 0 ? (
             comments.map((c) => (
               <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                <p className="font-semibold text-gray-800">{c.userName}</p>
-                <p className="mb-2 text-xs text-gray-500">
-                  {c.timestamp && c.timestamp.toDate
-                    ? new Date(c.timestamp.toDate()).toLocaleString()
-                    : 'Just now'}
-                </p>
-                <p className="whitespace-pre-wrap text-gray-700">{c.text}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {c.nickname || `User #${(c.userId || '').slice(-4)}`}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {c.timestamp?.toDate ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
+                      {c.editedAt ? ' • edited' : ''}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {canEdit(c) && (
+                      <button onClick={() => startEdit(c)} className="text-sm text-blue-600 hover:underline">
+                        Edit
+                      </button>
+                    )}
+                    {canDelete(c) && (
+                      <button onClick={() => remove(c.id)} className="text-sm text-red-600 hover:underline">
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {editingId === c.id ? (
+                  <div className="mt-3">
+                    <textarea
+                      className="w-full rounded-lg border border-gray-300 p-3"
+                      rows="3"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={saveEdit} className="rounded bg-green-600 px-3 py-1 text-white">Save</button>
+                      <button onClick={cancelEdit} className="rounded bg-gray-200 px-3 py-1">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 whitespace-pre-wrap text-gray-700">{c.text}</p>
+                )}
               </div>
             ))
           ) : (
@@ -892,6 +854,9 @@ function CommentsSection({ methodId, user }) {
   );
 }
 
+/* ---------------------------------------
+   Submit & Feedback Pages
+--------------------------------------- */
 function SubmitMethodPage({ onBack, user }) {
   const [formData, setFormData] = useState({
     title: '',
@@ -964,13 +929,7 @@ function SubmitMethodPage({ onBack, user }) {
         onClick={onBack}
         className="mb-8 flex items-center font-semibold text-blue-600 hover:text-blue-800"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="mr-2 h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
         Back to All Methods
@@ -1052,7 +1011,7 @@ function SubmitMethodPage({ onBack, user }) {
         </div>
 
         <div>
-          <label htmlFor="protocol" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="protocol" className="block text sm font-medium text-gray-700">
             Full Protocol Details
           </label>
           <textarea
@@ -1208,9 +1167,16 @@ function FeedbackPage({ onBack, user }) {
   );
 }
 
+/* ---------------------------------------
+   Gemini Advisor
+--------------------------------------- */
 function GeminiAdvisor({ methods, onClose }) {
+  const baseSymptoms = [
+    'Constipation','Diarrhea','Bloating','Gas','Abdominal pain',
+    'Nausea','Belching','Brain fog','Fullness','Reflux/Heartburn'
+  ];
   const allSymptoms = [
-    ...new Set(methods.flatMap((m) => m.commonSymptoms || [])),
+    ...new Set([...baseSymptoms, ...methods.flatMap((m) => m.commonSymptoms || [])]),
   ];
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [advice, setAdvice] = useState('');
@@ -1226,7 +1192,6 @@ function GeminiAdvisor({ methods, onClose }) {
       setAdvice('Please select at least one symptom to get advice.');
       return;
     }
-
     setIsLoading(true);
     setAdvice('');
 
@@ -1248,7 +1213,9 @@ IMPORTANT RULES:
 6. Helpful, empathetic, strictly informational.
 7. Do not invent information or suggest protocols not on the list.`;
 
-    const userQuery = `My primary symptoms are: ${selectedSymptoms.join(', ')}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?
+    const userQuery = `My primary symptoms are: ${selectedSymptoms.join(
+      ', '
+    )}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?
 
 Protocols Data:
 ${JSON.stringify(simplified, null, 2)}`;
@@ -1274,9 +1241,7 @@ ${JSON.stringify(simplified, null, 2)}`;
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`API call failed: ${response.status}`);
 
       const result = await response.json();
       const text = result?.candidates?.[0]?.content?.parts
@@ -1285,9 +1250,7 @@ ${JSON.stringify(simplified, null, 2)}`;
       setAdvice(text || "Sorry, I couldn't generate advice at this time.");
     } catch (err) {
       console.error('Gemini API call failed:', err);
-      setAdvice(
-        'Sorry, there was an error getting advice from the AI. Please try again.'
-      );
+      setAdvice('Sorry, there was an error getting advice from the AI. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -1297,33 +1260,16 @@ ${JSON.stringify(simplified, null, 2)}`;
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800 sm:text-3xl">
-            AI Protocol Advisor
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800"
-          >
-            <svg
-              className="h-8 w-8"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+          <h2 className="text-2xl font-bold text-gray-800 sm:text-3xl">AI Protocol Advisor</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <div className="mb-6">
-          <p className="mb-4 font-medium text-gray-600">
-            Select your primary symptoms to get a personalized summary.
-          </p>
+          <p className="mb-4 font-medium text-gray-600">Select your primary symptoms to get a personalized summary.</p>
           <div className="flex flex-wrap gap-2">
             {allSymptoms.map((sym) => (
               <button
@@ -1351,9 +1297,7 @@ ${JSON.stringify(simplified, null, 2)}`;
 
         {advice && (
           <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
-            <h3 className="mb-4 text-xl font-bold text-gray-800">
-              Your Personalized Summary
-            </h3>
+            <h3 className="mb-4 text-xl font-bold text-gray-800">Your Personalized Summary</h3>
             <p className="whitespace-pre-wrap text-gray-700">{advice}</p>
           </div>
         )}
@@ -1362,10 +1306,10 @@ ${JSON.stringify(simplified, null, 2)}`;
   );
 }
 
-// ---------------------------
-// App Root
-// ---------------------------
-function App() {
+/* ---------------------------------------
+   App Root
+--------------------------------------- */
+export default function App() {
   const [currentPage, setCurrentPage] = useState('list');
   const [selectedMethodId, setSelectedMethodId] = useState(null);
   const [votes, setVotes] = useState({});
@@ -1374,6 +1318,7 @@ function App() {
   const [authReady, setAuthReady] = useState(false);
   const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState('evidence');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!auth) {
@@ -1387,10 +1332,10 @@ function App() {
     return () => unsub();
   }, []);
 
+  // votes
   useEffect(() => {
     if (!db) return;
     const votesCollection = collection(db, 'votes');
-
     const unsub = onSnapshot(votesCollection, (snapshot) => {
       const data = {};
       (siboMethodsData || []).forEach((m) => (data[String(m.id)] = { likes: 0, dislikes: 0 }));
@@ -1399,10 +1344,10 @@ function App() {
       });
       setVotes(data);
     });
-
     return () => unsub();
   }, []);
 
+  // user votes
   useEffect(() => {
     if (user && db) {
       const userId = user.uid;
@@ -1418,6 +1363,20 @@ function App() {
     } else {
       setUserVotes({});
     }
+  }, [user]);
+
+  // admin check (admins/{uid} exists)
+  useEffect(() => {
+    if (!db || !user) { setIsAdmin(false); return; }
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'admins', user.uid));
+        setIsAdmin(snap.exists());
+      } catch (e) {
+        console.error('admin check failed', e);
+        setIsAdmin(false);
+      }
+    })();
   }, [user]);
 
   const handleSelectMethod = (id) => {
@@ -1490,7 +1449,7 @@ function App() {
       const likesB = votes[b.id]?.likes || 0;
       return likesB - likesA;
     }
-    const tierA = a.evidenceTier === 0 ? -1 : a.evidenceTier; // Put caution (0) at the bottom
+    const tierA = a.evidenceTier === 0 ? -1 : a.evidenceTier; // caution to bottom
     const tierB = b.evidenceTier === 0 ? -1 : b.evidenceTier;
     return tierB - tierA;
   });
@@ -1527,7 +1486,7 @@ function App() {
           return null;
         }
         return (
-          <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} />
+          <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} isAdmin={isAdmin} />
         );
       case 'submit':
         return <SubmitMethodPage onBack={handleBack} user={user} />;
@@ -1564,5 +1523,3 @@ function App() {
     </main>
   );
 }
-
-export default App;
