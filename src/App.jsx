@@ -198,11 +198,22 @@ const AiPatternAnalysis = () => {
 };
 
 /* ---------------------------------------
-    Audio section (placeholder)
+    Audio section
+    *** PODCAST FIX APPLIED HERE ***
 --------------------------------------- */
 const AudioSection = () => {
-  const episodes = []; // e.g., [{ title: 'Episode 1', src: '/audio/ep1.mp3' }]
+  // Updated episodes array with your Firebase Storage URL
+  const episodes = [
+    {
+      title: 'SIBO Unpacked: Your Gut Detective Guide',
+      src: 'https://firebasestorage.googleapis.com/v0/b/sibo-recovery-app.firebasestorage.app/o/SIBO%20Unpacked_%20Your%20Gut%20Detective%20Guide%20to%20Bloating%2C%20Pain%2C%20and%20Personalized%20Healing.mp3?alt=media&token=136277f0-b710-4f2c-91d2-5b889ca1b4e8'
+    }
+    // Add more episode objects here if needed, separated by commas
+  ];
+
+  // If the episodes array is empty, the component will render nothing
   if (!episodes.length) return null;
+
   return (
     <section className="max-w-4xl mx-auto mt-16 p-6 bg-white rounded-xl shadow-md border border-gray-200">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Audio: Stories & Tips</h2>
@@ -212,6 +223,7 @@ const AudioSection = () => {
             <p className="font-semibold mb-2">{ep.title}</p>
             <audio controls className="w-full">
               <source src={ep.src} type="audio/mpeg" />
+              Your browser does not support the audio element.
             </audio>
           </li>
         ))}
@@ -219,6 +231,9 @@ const AudioSection = () => {
     </section>
   );
 };
+/* ---------------------------------------
+    *** END OF PODCAST FIX ***
+--------------------------------------- */
 
 /* ---------------------------------------
     Methods data
@@ -387,10 +402,14 @@ function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
       await signInWithPopup(auth, googleProvider);
     } catch (e) {
       console.error('Google sign-in failed:', e);
+      // Attempt anonymous sign-in only if Google fails AND anonymous is enabled in Firebase.
+      // If anonymous isn't needed, remove this try/catch block.
       try {
         await signInAnonymously(auth);
+         console.log("Signed in anonymously after Google failed.");
       } catch (err) {
-        console.error('Anon sign-in failed:', err);
+        console.error('Anonymous sign-in also failed:', err);
+         // You might want to show an error message to the user here
       }
     } finally {
       setBusy(false);
@@ -432,7 +451,7 @@ function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
               onClick={doSignOut}
               className="px-3 py-1.5 rounded-md border text-sm"
             >
-              Sign out
+              Sign out {user.isAnonymous ? '(Anon)' : ''}
             </button>
           ) : (
             <button
@@ -473,6 +492,8 @@ const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
         className={`flex items-center space-x-2 transition-colors ${
           userVote === 'like' ? 'text-green-600' : 'text-gray-500 hover:text-green-600'
         }`}
+        // Disable voting if not signed in (optional, handleVote already checks)
+        // disabled={!auth?.currentUser}
       >
         <ThumbsUpIcon isSelected={userVote === 'like'} />
         <span className="font-semibold">{votes.likes}</span>
@@ -485,6 +506,7 @@ const MethodCard = ({ method, onSelect, onVote, votes, userVote }) => (
         className={`flex items-center space-x-2 transition-colors ${
           userVote === 'dislike' ? 'text-red-600' : 'text-gray-500 hover:text-red-600'
         }`}
+        // disabled={!auth?.currentUser}
       >
         <ThumbsDownIcon isSelected={userVote === 'dislike'} />
         <span className="font-semibold">{votes.dislikes}</span>
@@ -680,12 +702,21 @@ function generateNickname(uid = '') {
 }
 
 async function getOrCreateNickname(db, uid) {
+  if (!uid || !db) return `User #${String(Math.random()).slice(2, 6)}`; // Fallback for safety
   const uref = doc(db, 'users', uid);
-  const snap = await getDoc(uref);
-  if (snap.exists() && snap.data()?.nickname) return snap.data().nickname;
-  const nickname = generateNickname(uid);
-  await setDoc(uref, { nickname }, { merge: true });
-  return nickname;
+  try {
+      const snap = await getDoc(uref);
+      if (snap.exists() && snap.data()?.nickname) {
+          return snap.data().nickname;
+      }
+      const nickname = generateNickname(uid);
+      await setDoc(uref, { nickname }, { merge: true });
+      return nickname;
+  } catch (error) {
+      console.error("Error getting or creating nickname:", error);
+      // Return a temporary generic nickname if Firestore fails
+      return `User #${uid.slice(-4) || String(Math.random()).slice(2, 6)}`;
+  }
 }
 
 /* ---------------------------------------
@@ -697,33 +728,49 @@ function CommentsSection({ methodId, user, isAdmin }) {
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [nicknames, setNicknames] = useState({}); // Store fetched nicknames
 
+  // Fetch comments
   useEffect(() => {
     if (!db) return;
     const qref = query(collection(db, `methods/${methodId}/comments`), orderBy('timestamp', 'desc'));
     const unsub = onSnapshot(
       qref,
-      (snap) => setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), 
+      (snap) => {
+        const fetchedComments = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setComments(fetchedComments);
+        // Fetch nicknames for comment authors if not already fetched
+        fetchedComments.forEach(comment => {
+          if (comment.userId && !nicknames[comment.userId]) {
+            getOrCreateNickname(db, comment.userId).then(name => {
+              setNicknames(prev => ({ ...prev, [comment.userId]: name }));
+            });
+          }
+        });
+      },
       (err) => { console.error(err); setError('Could not load comments.'); }
     );
     return () => unsub();
-  }, [methodId]);
+  }, [methodId, db]); // Added db dependency
+
 
   const handleGoogleSignIn = async () => {
-    if (!auth) return;
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch (e) { console.error(e); try { await signInAnonymously(auth);} catch {} }
+    if (!auth || !googleProvider) return;
+    try { await signInWithPopup(auth, googleProvider); }
+    catch (e) {
+        console.error("Google Sign-in failed in Comments:", e);
+        // Maybe add user feedback here
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !user || !db) return;
     try {
-      const nickname = await getOrCreateNickname(db, user.uid);
+      // Nickname is fetched and displayed, not stored redundantly on comment
       await addDoc(collection(db, `methods/${methodId}/comments`), {
         text: newComment.trim(),
-        nickname,
-        userId: user.uid,
+        userId: user.uid, // Store only the user ID
         timestamp: serverTimestamp(),
       });
       setNewComment('');
@@ -737,32 +784,51 @@ function CommentsSection({ methodId, user, isAdmin }) {
   const cancelEdit = () => { setEditingId(null); setEditText(''); };
 
   const saveEdit = async () => {
-    if (!editingId || !editText.trim()) return;
+    if (!editingId || !editText.trim() || !db || !user) return;
+    // Check if the current user owns the comment before saving
+    const commentRef = doc(db, `methods/${methodId}/comments`, editingId);
     try {
-      await updateDoc(doc(db, `methods/${methodId}/comments`, editingId), {
-        text: editText.trim(),
-        editedAt: serverTimestamp(),
-      });
-      cancelEdit();
+        const commentSnap = await getDoc(commentRef);
+        if (commentSnap.exists() && commentSnap.data().userId === user.uid) {
+            await updateDoc(commentRef, {
+                text: editText.trim(),
+                editedAt: serverTimestamp(),
+            });
+            cancelEdit();
+        } else {
+             setError('You can only edit your own comments.');
+        }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to save edit:", e);
       setError('Failed to save changes.');
     }
   };
 
   const remove = async (id) => {
-    if (!user) return;
-    if (!window.confirm('Delete this comment?')) return;
+    if (!user || !db) return;
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+
+    const commentRef = doc(db, `methods/${methodId}/comments`, id);
     try {
-      await deleteDoc(doc(db, `methods/${methodId}/comments`, id));
+        const commentSnap = await getDoc(commentRef);
+        if (commentSnap.exists()) {
+            const commentData = commentSnap.data();
+            // Check ownership OR admin status
+            if (commentData.userId === user.uid || isAdmin) {
+                await deleteDoc(commentRef);
+            } else {
+                setError('You do not have permission to delete this comment.');
+            }
+        }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to delete comment:", e);
       setError('Failed to delete comment.');
     }
   };
 
-  const canEdit = (c) => user && c.userId === user.uid;
-  const canDelete = (c) => (user && c.userId === user.uid) || isAdmin;
+  // Permissions check based only on user ID and isAdmin prop
+  const canEdit = (commentUserId) => user && commentUserId === user.uid;
+  const canDelete = (commentUserId) => (user && commentUserId === user.uid) || isAdmin;
 
   return (
     <div className="mt-12">
@@ -776,6 +842,7 @@ function CommentsSection({ methodId, user, isAdmin }) {
               placeholder="Share your experience with this method..."
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
+              required // Make sure comment isn't empty
             />
             <button
               type="submit"
@@ -797,34 +864,38 @@ function CommentsSection({ methodId, user, isAdmin }) {
           </div>
         )}
 
-        {error && <p className="mb-4 text-red-500">{error}</p>}
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <div className="space-y-6">
           {comments.length > 0 ? (
             comments.map((c) => (
               <div key={c.id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold text-gray-800">
-                      {c.nickname || `User #${(c.userId || '').slice(-4)}`}
+                      {/* Display nickname from state, or a fallback */}
+                      {nicknames[c.userId] || `User #${(c.userId || '').slice(-4)}`}
                     </p>
                     <p className="text-xs text-gray-500">
                       {c.timestamp?.toDate ? new Date(c.timestamp.toDate()).toLocaleString() : 'Just now'}
                       {c.editedAt ? ' • edited' : ''}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    {canEdit(c) && (
-                      <button onClick={() => startEdit(c)} className="text-sm text-blue-600 hover:underline">
-                        Edit
-                      </button>
-                    )}
-                    {canDelete(c) && (
-                      <button onClick={() => remove(c.id)} className="text-sm text-red-600 hover:underline">
-                        Delete
-                      </button>
-                    )}
-                  </div>
+                  {/* Show buttons only if user is logged in */}
+                  {user && (
+                    <div className="flex flex-shrink-0 gap-2 pl-4">
+                      {canEdit(c.userId) && (
+                        <button onClick={() => startEdit(c)} className="text-sm text-blue-600 hover:underline">
+                          Edit
+                        </button>
+                      )}
+                      {canDelete(c.userId) && (
+                        <button onClick={() => remove(c.id)} className="text-sm text-red-600 hover:underline">
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {editingId === c.id ? (
@@ -834,10 +905,17 @@ function CommentsSection({ methodId, user, isAdmin }) {
                       rows="3"
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
+                      required
                     />
                     <div className="mt-2 flex gap-2">
-                      <button onClick={saveEdit} className="rounded bg-green-600 px-3 py-1 text-white">Save</button>
-                      <button onClick={cancelEdit} className="rounded bg-gray-200 px-3 py-1">Cancel</button>
+                      <button
+                        onClick={saveEdit}
+                        disabled={!editText.trim()}
+                        className="rounded bg-green-600 px-3 py-1 text-sm text-white disabled:bg-gray-400"
+                       >
+                         Save
+                       </button>
+                      <button onClick={cancelEdit} className="rounded bg-gray-200 px-3 py-1 text-sm">Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -846,13 +924,14 @@ function CommentsSection({ methodId, user, isAdmin }) {
               </div>
             ))
           ) : (
-            <p className="text-gray-500">No comments yet. Be the first to share your experience!</p>
+             <p className="text-gray-500">No comments yet. Be the first to share your experience!</p>
           )}
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ---------------------------------------
     Submit & Feedback Pages
@@ -873,17 +952,20 @@ function SubmitMethodPage({ onBack, user }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user || !db) return;
+    if (!user || !db || user.isAnonymous) { // Prevent anonymous submissions
+         alert("Please sign in with Google to submit a method.");
+         return;
+    }
 
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'submissions'), {
         ...formData,
-        submittedBy: user.uid,
+        submittedBy: user.uid, // Store UID, not potentially anonymous status
         submittedAt: serverTimestamp(),
       });
       alert('Thank you for your submission! It will be reviewed shortly.');
-      onBack();
+      onBack(); // Go back after successful submission
     } catch (error) {
       console.error('Error submitting form: ', error);
       alert('Sorry, there was an error submitting your form. Please try again.');
@@ -892,7 +974,19 @@ function SubmitMethodPage({ onBack, user }) {
     }
   };
 
-  if (!user) {
+  // Sign-in prompt specific for this page
+  const handleGoogleSignInForSubmit = async () => {
+      if (!auth || !googleProvider) return;
+      try {
+          await signInWithPopup(auth, googleProvider);
+          // User state will update via onAuthStateChanged, allowing form to show
+      } catch (error) {
+          console.error("Google sign-in failed:", error);
+          alert("Sign-in failed. Please try again.");
+      }
+  };
+
+  if (!user || user.isAnonymous) { // Show prompt if not logged in OR is anonymous
     return (
       <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
         <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">
@@ -901,15 +995,7 @@ function SubmitMethodPage({ onBack, user }) {
         <p className="mb-8 text-lg text-gray-600">
           Please{' '}
           <button
-            onClick={async () => {
-              if (auth && googleProvider) {
-                try {
-                  await signInWithPopup(auth, googleProvider);
-                } catch (error) {
-                  console.error('Google sign-in failed:', error);
-                }
-              }
-            }}
+            onClick={handleGoogleSignInForSubmit}
             className="font-semibold text-blue-600 hover:underline"
           >
             sign in with Google
@@ -923,6 +1009,7 @@ function SubmitMethodPage({ onBack, user }) {
     );
   }
 
+  // Render form only if user is logged in with Google (not anonymous)
   return (
     <div className="mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
       <button
@@ -996,23 +1083,23 @@ function SubmitMethodPage({ onBack, user }) {
 
         <div>
           <label htmlFor="symptoms" className="block text-sm font-medium text-gray-700">
-            What symptoms is this method best for?
+            What symptoms is this method best for? (comma-separated)
           </label>
-          <textarea
+          <input
+            type="text"
             name="symptoms"
             id="symptoms"
-            rows="3"
             required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            placeholder="e.g., Methane-dominant SIBO, Chronic Constipation, Brain Fog"
+            placeholder="e.g., Methane SIBO, Constipation, Brain Fog"
             value={formData.symptoms}
             onChange={handleChange}
           />
         </div>
 
         <div>
-          <label htmlFor="protocol" className="block text sm font-medium text-gray-700">
-            Full Protocol Details
+          <label htmlFor="protocol" className="block text-sm font-medium text-gray-700">
+            Full Protocol Details (Phases, Steps, Dosages)
           </label>
           <textarea
             name="protocol"
@@ -1028,7 +1115,7 @@ function SubmitMethodPage({ onBack, user }) {
 
         <div>
           <label htmlFor="sampleDay" className="block text-sm font-medium text-gray-700">
-            A Sample Day
+            A Sample Day (Schedule Format if possible)
           </label>
           <textarea
             name="sampleDay"
@@ -1056,22 +1143,26 @@ function SubmitMethodPage({ onBack, user }) {
   );
 }
 
+
 function FeedbackPage({ onBack, user }) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e) => {
+   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!feedback.trim() || !user || !db) return;
+    if (!feedback.trim() || !user || !db || user.isAnonymous) { // Prevent anonymous feedback
+         alert("Please sign in with Google to submit feedback.");
+         return;
+    }
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'feedback'), {
-        feedbackText: feedback,
-        submittedBy: user.uid,
+        feedbackText: feedback.trim(),
+        submittedBy: user.uid, // Store UID
         submittedAt: serverTimestamp(),
       });
       alert('Thank you for your feedback!');
-      onBack();
+      onBack(); // Go back after successful submission
     } catch (error) {
       console.error('Error submitting feedback: ', error);
       alert('Sorry, there was an error submitting your feedback. Please try again.');
@@ -1080,7 +1171,19 @@ function FeedbackPage({ onBack, user }) {
     }
   };
 
-  if (!user) {
+  // Sign-in prompt specific for this page
+  const handleGoogleSignInForFeedback = async () => {
+      if (!auth || !googleProvider) return;
+      try {
+          await signInWithPopup(auth, googleProvider);
+      } catch (error) {
+          console.error("Google sign-in failed:", error);
+          alert("Sign-in failed. Please try again.");
+      }
+  };
+
+
+  if (!user || user.isAnonymous) { // Show prompt if not logged in OR is anonymous
     return (
       <div className="mx-auto max-w-4xl p-4 text-center sm:p-6 md:p-8">
         <h1 className="mb-4 text-3xl font-extrabold text-gray-900 sm:text-4xl">
@@ -1089,15 +1192,7 @@ function FeedbackPage({ onBack, user }) {
         <p className="mb-8 text-lg text-gray-600">
           Please{' '}
           <button
-            onClick={async () => {
-              if (auth && googleProvider) {
-                try {
-                  await signInWithPopup(auth, googleProvider);
-                } catch (error) {
-                  console.error('Google sign-in failed:', error);
-                }
-              }
-            }}
+             onClick={handleGoogleSignInForFeedback}
             className="font-semibold text-blue-600 hover:underline"
           >
             sign in with Google
@@ -1111,6 +1206,7 @@ function FeedbackPage({ onBack, user }) {
     );
   }
 
+  // Render form only if user is logged in with Google (not anonymous)
   return (
     <div className="mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
       <button
@@ -1132,8 +1228,7 @@ function FeedbackPage({ onBack, user }) {
         Share Your Feedback
       </h1>
       <p className="mb-8 text-gray-600">
-        Have an idea to improve the site? Found a bug? Let us know!
-        Your feedback helps make this a better resource for the community.
+        Have an idea to improve the site? Found a bug? Let us know! Your feedback helps make this a better resource for the community.
       </p>
       <form
         onSubmit={handleSubmit}
@@ -1157,7 +1252,7 @@ function FeedbackPage({ onBack, user }) {
         <div>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !feedback.trim()}
             className="w-full justify-center rounded-md bg-purple-600 py-2 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:bg-gray-400"
           >
             {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
@@ -1168,6 +1263,7 @@ function FeedbackPage({ onBack, user }) {
   );
 }
 
+
 /* ---------------------------------------
     Gemini Advisor
 --------------------------------------- */
@@ -1176,8 +1272,9 @@ function GeminiAdvisor({ methods, onClose }) {
     'Constipation','Diarrhea','Bloating','Gas','Abdominal pain',
     'Nausea','Belching','Brain fog','Fullness','Reflux/Heartburn'
   ];
+  // Ensure commonSymptoms exists and is an array before flatMapping
   const allSymptoms = [
-    ...new Set([...baseSymptoms, ...methods.flatMap((m) => m.commonSymptoms || [])]),
+    ...new Set([...baseSymptoms, ...methods.flatMap((m) => Array.isArray(m.commonSymptoms) ? m.commonSymptoms : [])]),
   ];
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [advice, setAdvice] = useState('');
@@ -1196,31 +1293,19 @@ function GeminiAdvisor({ methods, onClose }) {
     setIsLoading(true);
     setAdvice('');
 
+    // Prepare simplified data, ensuring commonSymptoms is always an array
     const simplified = methods.map((m) => ({
       title: m.title,
       summary: m.summary,
       evidenceTier: m.evidenceTier,
-      commonSymptoms: m.commonSymptoms,
+      commonSymptoms: Array.isArray(m.commonSymptoms) ? m.commonSymptoms : [],
     }));
 
-    const systemPrompt = `You are an AI assistant for a SIBO recovery website.
-Your role is to provide a helpful, non-medical summary based on user-reported symptoms and a list of community-sourced treatment protocols.
-
-IMPORTANT RULES:
-1. DO NOT PROVIDE MEDICAL ADVICE. Start every single response with this exact disclaimer: "This is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment."
-2. Analyze the user's selected symptoms and the provided list of protocols.
-3. Identify which protocols are most relevant to the user's symptoms based on the 'commonSymptoms' listed for each protocol.
-4. Summarize in 2-3 short paragraphs.
-5. Mention the 'evidenceTier'.
-6. Helpful, empathetic, strictly informational.
-7. Do not invent information or suggest protocols not on the list.`;
+    const systemPrompt = `You are an AI assistant for a SIBO recovery website. Your role is to provide a helpful, non-medical summary based on user-reported symptoms and a list of community-sourced treatment protocols.\n\nIMPORTANT RULES:\n1. DO NOT PROVIDE MEDICAL ADVICE. Start every single response with this exact disclaimer: "This is not medical advice. Always consult with a qualified healthcare professional before starting any new treatment."\n2. Analyze the user's selected symptoms and the provided list of protocols.\n3. Identify which protocols are most relevant to the user's symptoms based on the 'commonSymptoms' listed for each protocol.\n4. Summarize in 2-3 short paragraphs.\n5. Mention the 'evidenceTier'.\n6. Helpful, empathetic, strictly informational.\n7. Do not invent information or suggest protocols not on the list.`;
 
     const userQuery = `My primary symptoms are: ${selectedSymptoms.join(
       ', '
-    )}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?
-
-Protocols Data:
-${JSON.stringify(simplified, null, 2)}`;
+    )}. Based on the following data, which protocols might be relevant for me to research further and discuss with my doctor?\n\nProtocols Data:\n${JSON.stringify(simplified, null, 2)}`;
 
     if (!GEMINI_API_KEY) {
       setAdvice(
@@ -1237,29 +1322,38 @@ ${JSON.stringify(simplified, null, 2)}`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] },
+            // Ensure systemInstruction structure matches API expectation if changed in future versions
+            system_instruction: { role: 'system', parts: [{ text: systemPrompt }] }, // Corrected field name? Check API docs if issues persist
             contents: [{ role: 'user', parts: [{ text: userQuery }] }],
           }),
         }
       );
 
-      if (!response.ok) throw new Error(`API call failed: ${response.status}`);
+      if (!response.ok) {
+        // Try to get more error details from the response body
+        const errorBody = await response.text();
+        console.error('Gemini API Error Response:', errorBody);
+        throw new Error(`API call failed: ${response.status} - ${response.statusText}`);
+      }
+
 
       const result = await response.json();
+      // Safely access nested properties
       const text = result?.candidates?.[0]?.content?.parts
         ?.map((p) => p.text)
         .join('\n');
-      setAdvice(text || "Sorry, I couldn't generate advice at this time.");
+      setAdvice(text || "Sorry, I couldn't generate advice at this time. The response might be empty or blocked.");
+
     } catch (err) {
       console.error('Gemini API call failed:', err);
-      setAdvice('Sorry, there was an error getting advice from the AI. Please try again.');
+      setAdvice(`Sorry, there was an error getting advice from the AI: ${err.message}. Please try again.`);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-800 sm:text-3xl">AI Protocol Advisor</h2>
@@ -1271,7 +1365,7 @@ ${JSON.stringify(simplified, null, 2)}`;
         </div>
 
         <div className="mb-6">
-          <p className="mb-4 font-medium text-gray-600">Select your primary symptoms to get a personalized summary.</p>
+          <p className="mb-4 font-medium text-gray-600">Select your primary symptoms to get a personalized summary (for informational purposes only).</p>
           <div className="flex flex-wrap gap-2">
             {allSymptoms.map((sym) => (
               <button
@@ -1300,13 +1394,19 @@ ${JSON.stringify(simplified, null, 2)}`;
         {advice && (
           <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
             <h3 className="mb-4 text-xl font-bold text-gray-800">Your Personalized Summary</h3>
-            <p className="whitespace-pre-wrap text-gray-700">{advice}</p>
+            {/* Render advice with line breaks */}
+            <div className="whitespace-pre-wrap text-gray-700">
+                {advice.split('\n').map((line, index) => (
+                    <p key={index}>{line}</p> // Render each line as a paragraph
+                ))}
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 }
+
 
 /* ---------------------------------------
     App Root
@@ -1320,67 +1420,82 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState('evidence');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // State to track admin status
 
+  // Auth State Listener
   useEffect(() => {
     if (!auth) {
-      setAuthReady(true);
+      setAuthReady(true); // Firebase not initialized, mark as ready to show error or default state
       return;
     }
     const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      setUser(currentUser); // currentUser is null if not logged in
       setAuthReady(true);
     });
-    return () => unsub();
-  }, []);
+    return () => unsub(); // Cleanup subscription on unmount
+  }, []); // Run only once on mount
 
-  // votes
+  // Fetch Aggregate Votes
   useEffect(() => {
-    if (!db) return;
+    if (!db) return; // Don't run if Firestore isn't initialized
     const votesCollection = collection(db, 'votes');
     const unsub = onSnapshot(votesCollection, (snapshot) => {
       const data = {};
+      // Initialize votes for all methods to ensure they appear even with 0 votes
       (siboMethodsData || []).forEach((m) => (data[String(m.id)] = { likes: 0, dislikes: 0 }));
       snapshot.docs.forEach((d) => {
-        data[d.id] = d.data();
+        data[d.id] = d.data(); // Overwrite with actual data from Firestore
       });
       setVotes(data);
+    }, (error) => {
+        console.error("Error fetching votes snapshot:", error);
     });
-    return () => unsub();
-  }, []);
+    return () => unsub(); // Cleanup listener
+  }, [db]); // Rerun if db changes (though it shouldn't after init)
 
-  // user votes
+  // Fetch User-Specific Votes
   useEffect(() => {
+    // Only run if user is logged in AND db is initialized
     if (user && db) {
       const userId = user.uid;
       const userVotesCollection = collection(db, `users/${userId}/userVotes`);
       const unsub = onSnapshot(userVotesCollection, (snapshot) => {
         const mine = {};
         snapshot.docs.forEach((d) => {
-          mine[d.id] = d.data().vote;
+          mine[d.id] = d.data().vote; // d.id is the methodId, d.data().vote is 'like' or 'dislike'
         });
         setUserVotes(mine);
+      }, (error) => {
+          console.error("Error fetching user votes:", error);
+          setUserVotes({}); // Reset user votes on error
       });
-      return () => unsub();
+      return () => unsub(); // Cleanup listener
     } else {
-      setUserVotes({});
+      setUserVotes({}); // Clear votes if user logs out or db isn't ready
     }
-  }, [user]);
+  }, [user, db]); // Rerun when user or db state changes
 
-  // admin check (admins/{uid} exists)
+  // Admin Check
   useEffect(() => {
-    if (!db || !user) { setIsAdmin(false); return; }
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'admins', user.uid));
-        setIsAdmin(snap.exists());
-      } catch (e) {
-        console.error('admin check failed', e);
-        setIsAdmin(false);
-      }
-    })();
-  }, [user]);
+    // Only run if user is logged in (not anonymous) AND db is initialized
+    if (user && !user.isAnonymous && db) {
+      const checkAdmin = async () => {
+        try {
+          const adminDocRef = doc(db, 'admins', user.uid);
+          const adminDocSnap = await getDoc(adminDocRef);
+          setIsAdmin(adminDocSnap.exists()); // True if a document exists at /admins/{user.uid}
+        } catch (e) {
+          console.error('Admin check failed:', e);
+          setIsAdmin(false); // Default to false on error
+        }
+      };
+      checkAdmin();
+    } else {
+      setIsAdmin(false); // Not admin if not logged in or anonymous or db not ready
+    }
+  }, [user, db]); // Rerun when user or db state changes
 
+  // --- Navigation Handlers ---
   const handleSelectMethod = (id) => {
     setSelectedMethodId(id);
     setCurrentPage('detail');
@@ -1393,20 +1508,32 @@ export default function App() {
   const handleSubmitMethod = () => setCurrentPage('submit');
   const handleFeedback = () => setCurrentPage('feedback');
 
+  // --- Voting Logic ---
   const handleVote = async (id, voteType) => {
-    if (!auth || !db) return;
-
-    let currentUser = auth.currentUser;
-    if (!currentUser) {
-      try {
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        currentUser = result.user;
-      } catch (e) {
-        console.error('Sign-in for vote failed', e);
+    // Ensure auth and db are ready
+    if (!auth || !db) {
+        console.error("Auth or DB not initialized for voting.");
         return;
-      }
     }
+    let currentUser = auth.currentUser;
+
+    // Prompt Google Sign-in if not logged in or anonymous
+    if (!currentUser || currentUser.isAnonymous) {
+        if (window.confirm("Please sign in with Google to vote. Would you like to sign in now?")) {
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                currentUser = result.user; // Update currentUser after successful sign-in
+                if (!currentUser) return; // Exit if sign-in failed somehow
+            } catch (e) {
+                console.error('Sign-in required for vote failed:', e);
+                 alert("Sign-in failed. Please try again to vote.");
+                return; // Exit if sign-in fails
+            }
+        } else {
+            return; // User chose not to sign in
+        }
+    }
+
 
     const methodId = String(id);
     const userId = currentUser.uid;
@@ -1416,48 +1543,71 @@ export default function App() {
 
     try {
       await runTransaction(db, async (tx) => {
+        // Get current aggregate votes and user's previous vote atomically
         const [voteDocSnap, userVoteSnap] = await Promise.all([
           tx.get(voteDocRef),
           tx.get(userVoteDocRef),
         ]);
 
+        // Initialize counts from Firestore or default to 0
         let likes = voteDocSnap.exists() ? voteDocSnap.data().likes || 0 : 0;
         let dislikes = voteDocSnap.exists() ? voteDocSnap.data().dislikes || 0 : 0;
 
-        const prev = userVoteSnap.exists() ? userVoteSnap.data().vote : null;
-        if (prev === 'like') likes = Math.max(0, likes - 1);
-        if (prev === 'dislike') dislikes = Math.max(0, dislikes - 1);
+        // Get user's previous vote state (null if never voted)
+        const previousVote = userVoteSnap.exists() ? userVoteSnap.data().vote : null;
 
-        if (voteType !== prev) {
-          if (voteType === 'like') likes++;
-          if (voteType === 'dislike') dislikes++;
-          tx.set(userVoteDocRef, { vote: voteType });
-        } else {
-          tx.delete(userVoteDocRef);
+        // --- Logic to update counts based on previous and current vote ---
+
+        // If user is toggling their vote OFF (clicking the same button again)
+        if (voteType === previousVote) {
+          if (voteType === 'like') likes = Math.max(0, likes - 1); // Decrement likes
+          if (voteType === 'dislike') dislikes = Math.max(0, dislikes - 1); // Decrement dislikes
+          tx.delete(userVoteDocRef); // Remove user's vote record
+        }
+        // If user is changing their vote (e.g., from like to dislike)
+        else if (previousVote) {
+           if (previousVote === 'like') likes = Math.max(0, likes - 1); // Remove old like
+           if (previousVote === 'dislike') dislikes = Math.max(0, dislikes - 1); // Remove old dislike
+           // Add the new vote
+           if (voteType === 'like') likes++;
+           if (voteType === 'dislike') dislikes++;
+           tx.set(userVoteDocRef, { vote: voteType }); // Update user's vote record
+        }
+        // If user is voting for the first time
+        else {
+           if (voteType === 'like') likes++;
+           if (voteType === 'dislike') dislikes++;
+           tx.set(userVoteDocRef, { vote: voteType }); // Create user's vote record
         }
 
-        tx.set(voteDocRef, { likes, dislikes }, { merge: true });
+        // --- Update the aggregate counts ---
+        tx.set(voteDocRef, { likes, dislikes }, { merge: true }); // Use merge to avoid overwriting unrelated fields
       });
+       // console.log("Vote transaction successful");
     } catch (e) {
-      console.error('Transaction failed: ', e);
+      console.error('Vote transaction failed: ', e);
+       alert("Your vote could not be recorded. Please try again."); // User feedback
     }
   };
 
-  const methods = siboMethodsData;
-
+  // --- Sorting Logic ---
+  const methods = siboMethodsData; // Assuming this is your static data array
   const sortedMethods = [...methods].sort((a, b) => {
     if (sortOrder === 'likes') {
       const likesA = votes[a.id]?.likes || 0;
       const likesB = votes[b.id]?.likes || 0;
-      return likesB - likesA;
+      return likesB - likesA; // Sort descending by likes
     }
-    const tierA = a.evidenceTier === 0 ? -1 : a.evidenceTier; // caution to bottom
+    // Default: Sort by evidence tier (Tier 1 first, Tier 0 last)
+    const tierA = a.evidenceTier === 0 ? -1 : a.evidenceTier; // Treat Tier 0 as lowest for sorting
     const tierB = b.evidenceTier === 0 ? -1 : b.evidenceTier;
-    return tierB - tierA;
+    return tierB - tierA; // Sort descending by tier number (higher number = better evidence, except 0)
   });
 
+  // Find the selected method based on ID
   const selectedMethod = methods.find((m) => m.id === selectedMethodId);
 
+  // --- Render Conditions ---
   if (!isFirebaseConfigValid()) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
@@ -1475,19 +1625,22 @@ export default function App() {
   if (!authReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        {/* You could add a spinner here */}
         <p className="text-gray-600">Loading Community Hub...</p>
       </div>
     );
   }
 
+  // --- Page Router Logic ---
   const renderPage = () => {
     switch (currentPage) {
       case 'detail':
         if (!selectedMethod) {
-          handleBack();
+          handleBack(); // Go back if method not found (e.g., invalid ID)
           return null;
         }
         return (
+          // Pass isAdmin prop down
           <MethodDetailPage method={selectedMethod} onBack={handleBack} user={user} isAdmin={isAdmin} />
         );
       case 'submit':
@@ -1503,13 +1656,14 @@ export default function App() {
             onVote={handleVote}
             votes={votes}
             userVotes={userVotes}
-            onSortChange={setSortOrder}
+            onSortChange={setSortOrder} // Pass setter function
             onOpenAdvisor={() => setIsAdvisorOpen(true)}
           />
         );
     }
   };
 
+  // --- Main App Return ---
   return (
     <main className="min-h-screen font-sans bg-gray-50">
       <Header
