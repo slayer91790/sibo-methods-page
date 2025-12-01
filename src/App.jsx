@@ -48,12 +48,10 @@ if (!firebaseConfig) {
     appId: process.env.REACT_APP_FIREBASE_APP_ID,
   };
 }
-const GEMINI_API_KEY =
-  typeof process !== 'undefined' ? process.env.REACT_APP_GEMINI_API_KEY : '';
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY || '';
 
 const isFirebaseConfigValid = () =>
-  firebaseConfig &&
-  Object.values(firebaseConfig).every((v) => v && String(v).trim() !== '');
+  firebaseConfig && Object.values(firebaseConfig).every(v => v && String(v).trim() !== '');
 
 let app = null;
 let db = null;
@@ -80,36 +78,14 @@ if (isFirebaseConfigValid()) {
    Icons / small components
 --------------------------------------- */
 const ThumbsUpIcon = ({ isSelected }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-6 w-6"
-    fill={isSelected ? 'currentColor' : 'none'}
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z"
-    />
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 18.734V6a2 2 0 012-2h4a2 2 0 012 2v4z" />
   </svg>
 );
 
 const ThumbsDownIcon = ({ isSelected }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-6 w-6"
-    fill={isSelected ? 'currentColor' : 'none'}
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 5.266V18a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4z"
-    />
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isSelected ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 5.266V18a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4z" />
   </svg>
 );
 
@@ -243,7 +219,7 @@ const siboMethodsData = [
     title: 'Rifaximin-Based Pharmaceutical Protocol',
     summary:
       'Targeted, gut-specific antibiotics (Rifaximin ± a pairing antibiotic for methane cases) to reduce bacterial load with minimal systemic effects.',
-    evidenceTier: 1,
+    evidenceTier: 1, 
     commonSymptoms: [
       'Hydrogen-dominant SIBO',
       'Diarrhea',
@@ -268,46 +244,18 @@ const siboMethodsData = [
       {
         phase: 'Phase 1 — Antibiotic Treatment (≈14 days)',
         steps: [
-          {
-            title: 'Hydrogen-dominant SIBO',
-            items: ['Rifaximin 550 mg, three times daily.']
-          },
-          {
-            title: 'Methane-dominant / IMO',
-            items: [
-              'Rifaximin 550 mg, three times daily',
-              'PLUS Neomycin 500 mg, twice daily (or Metronidazole per clinician).'
-            ]
-          },
-          {
-            title: 'PHGG (Optional adjunct)',
-            description:
-              'Some evidence/experiences suggest 5 g partially hydrolyzed guar gum with each rifaximin dose may improve response.'
-          }
+          { title: 'Hydrogen-dominant SIBO', items: ['Rifaximin 550 mg, three times daily.'] },
+          { title: 'Methane-dominant / IMO', items: ['Rifaximin 550 mg, three times daily', 'PLUS Neomycin 500 mg, twice daily (or Metronidazole per clinician).'] },
+          { title: 'PHGG (Optional adjunct)', description: 'Some evidence/experiences suggest 5 g partially hydrolyzed guar gum with each rifaximin dose may improve response.' }
         ]
       },
       {
         phase: 'Phase 2 — Post-Antibiotic Recovery & Prevention',
         steps: [
-          {
-            title: 'Diet (4–6 weeks)',
-            description:
-              'Low FODMAP or Specific Carbohydrate Diet to manage symptoms and reduce quick relapse risk.'
-          },
-          {
-            title: 'Prokinetics (critical for recurrence prevention)',
-            description:
-              'Support MMC—discuss options (e.g., ginger/artichoke or Rx like low-dose erythromycin/prucalopride).'
-          },
-          {
-            title: 'Address the root cause',
-            description:
-              'Work with your clinician to evaluate motility disorders, anatomical issues, or autoimmune contributors.'
-          },
-          {
-            title: 'Gut-healing support',
-            items: ['L-glutamine', 'Zinc carnosine', 'Bone broth or similar soothing options']
-          }
+          { title: 'Diet (4–6 weeks)', description: 'Low FODMAP or Specific Carbohydrate Diet to manage symptoms and reduce quick relapse risk.' },
+          { title: 'Prokinetics (critical for recurrence prevention)', description: 'Support MMC—discuss options (e.g., ginger/artichoke or Rx like low-dose erythromycin/prucalopride).' },
+          { title: 'Address the root cause', description: 'Work with your clinician to evaluate motility disorders, anatomical issues, or autoimmune contributors.' },
+          { title: 'Gut-healing support', items: ['L-glutamine', 'Zinc carnosine', 'Bone broth or similar soothing options'] }
         ]
       }
     ]
@@ -335,55 +283,23 @@ const siboMethodsData = [
       {
         phase: 'Phase 1 — Antimicrobial Treatment (4–6 weeks)',
         steps: [
-          {
-            title: 'Rotating combinations',
-            description:
-              'Use 2–3 botanicals together and rotate every 2–3 weeks to reduce resistance risk.'
-          },
-          {
-            title: 'Common options (typical adult ranges)',
-            items: [
-              'Berberine: 500 mg, 2–3×/day',
-              'Oregano oil (enteric-coated): 100–200 mg carvacrol, 2–3×/day',
-              'Neem extract: 400–500 mg, 2–3×/day',
-              'Allicin (garlic extract): 400–500 mg, 2–3×/day'
-            ]
-          },
-          {
-            title: 'Biofilm disruptors (30 min before herb doses)',
-            items: ['N-acetylcysteine (NAC)', 'Proprietary enzyme blends, per product directions']
-          }
+          { title: 'Rotating combinations', description: 'Use 2–3 botanicals together and rotate every 2–3 weeks to reduce resistance risk.' },
+          { title: 'Common options (typical adult ranges)', items: ['Berberine: 500 mg, 2–3×/day', 'Oregano oil (enteric-coated): 100–200 mg carvacrol, 2–3×/day', 'Neem extract: 400–500 mg, 2–3×/day', 'Allicin (garlic extract): 400–500 mg, 2–3×/day'] },
+          { title: 'Biofilm disruptors (30 min before herb doses)', items: ['N-acetylcysteine (NAC)', 'Proprietary enzyme blends, per product directions'] }
         ]
       },
       {
         phase: 'Phase 2 — Dietary Management (concurrent + 4 weeks after)',
         steps: [
-          {
-            title: 'Low FODMAP',
-            description:
-              'Short-term strict Low FODMAP (e.g., use the Monash app) to reduce fermentable carbs feeding the overgrowth.'
-          }
+          { title: 'Low FODMAP', description: 'Short-term strict Low FODMAP (e.g., use the Monash app) to reduce fermentable carbs feeding the overgrowth.' }
         ]
       },
       {
         phase: 'Phase 3 — Prevention & Gut Healing (ongoing)',
         steps: [
-          {
-            title: 'Prokinetics (MMC support)',
-            items: ['Natural: ginger + artichoke', 'Prescription: low-dose erythromycin or prucalopride']
-          },
-          {
-            title: 'Digestive support',
-            items: [
-              'Betaine HCl with meals (titrate carefully per clinician)',
-              'Broad-spectrum digestive enzymes as needed'
-            ]
-          },
-          {
-            title: 'Gradual food reintroduction',
-            description:
-              'Systematically reintroduce FODMAP foods to discover personal triggers and expand diet diversity.'
-          }
+          { title: 'Prokinetics (MMC support)', items: ['Natural: ginger + artichoke', 'Prescription: low-dose erythromycin or prucalopride'] },
+          { title: 'Digestive support', items: ['Betaine HCl with meals (titrate carefully per clinician)', 'Broad-spectrum digestive enzymes as needed'] },
+          { title: 'Gradual food reintroduction', description: 'Systematically reintroduce FODMAP foods to discover personal triggers and expand diet diversity.' }
         ]
       }
     ]
@@ -411,44 +327,22 @@ const siboMethodsData = [
       {
         phase: 'Phase 1 — Elemental Diet (14–21 days)',
         steps: [
-          {
-            title: 'Exclusive consumption',
-            description:
-              'Only elemental formula + water unless your clinician specifies otherwise. No other foods/supplements.'
-          },
-          {
-            title: 'Formula options',
-            description:
-              'Commercial or carefully prepared “homemade” versions; must include amino acids, simple carbs, and fats in easily absorbable forms.'
-          }
+          { title: 'Exclusive consumption', description: 'Only elemental formula + water unless your clinician specifies otherwise. No other foods/supplements.' },
+          { title: 'Formula options', description: 'Commercial or carefully prepared “homemade” versions; must include amino acids, simple carbs, and fats in easily absorbable forms.' }
         ]
       },
       {
         phase: 'Phase 2 — Slow Reintroduction',
         steps: [
-          {
-            title: 'Day 1 post-diet',
-            items: ['Well-cooked, single-ingredient, low-FODMAP foods (e.g., steamed carrots, plain broth).']
-          },
-          {
-            title: 'Subsequent days',
-            description:
-              'Introduce one simple new food per day; monitor closely. Often guided by Low FODMAP or SCD principles.'
-          }
+          { title: 'Day 1 post-diet', items: ['Well-cooked, single-ingredient, low-FODMAP foods (e.g., steamed carrots, plain broth).'] },
+          { title: 'Subsequent days', description: 'Introduce one simple new food per day; monitor closely. Often guided by Low FODMAP or SCD principles.' }
         ]
       },
       {
         phase: 'Phase 3 — Long-Term Prevention',
         steps: [
-          {
-            title: 'Personalized diet',
-            description:
-              'Continue with a modified, diverse diet based on tolerated foods and identified triggers.'
-          },
-          {
-            title: 'Prokinetics & gut support',
-            items: ['MMC support as above', 'Optional soothing/gut-repair strategies per clinician']
-          }
+          { title: 'Personalized diet', description: 'Continue with a modified, diverse diet based on tolerated foods and identified triggers.' },
+          { title: 'Prokinetics & gut support', items: ['MMC support as above', 'Optional soothing/gut-repair strategies per clinician'] }
         ]
       }
     ]
@@ -522,9 +416,92 @@ const siboMethodsData = [
 ];
 
 /* ---------------------------------------
+   Admin Dashboard Component
+--------------------------------------- */
+const AdminDashboard = ({ onBack }) => {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, 'submissions'), orderBy('submittedAt', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  const copyToClipboard = (sub) => {
+    const codeSnippet = `
+  {
+    id: ${Date.now()}, // Replace with a unique ID
+    title: '${sub.title.replace(/'/g, "\\'")}',
+    summary: '${sub.summary.replace(/'/g, "\\'")}',
+    evidenceTier: 3, // Default to Tier 3 for new user submissions
+    commonSymptoms: [${Array.isArray(sub.symptoms) ? sub.symptoms.map(s => `'${s.replace(/'/g, "\\'")}'`).join(', ') : `'${sub.symptoms}'`}],
+    citation: { text: 'Community submission', url: '${sub.sourceLink || ''}' },
+    sampleDay: { title: 'Sample Day', schedule: [] }, // You may need to format this manually
+    protocol: [{ phase: 'Phase 1', steps: [{ title: 'Protocol Details', description: \`${sub.protocol}\` }] }] 
+  },`;
+    navigator.clipboard.writeText(codeSnippet);
+    alert('Copied code snippet to clipboard! You can now paste it into the siboMethodsData array in App.jsx.');
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
+      <button onClick={onBack} className="mb-8 flex items-center font-semibold text-blue-600 hover:text-blue-800">
+        &larr; Back to Home
+      </button>
+      <h1 className="mb-6 text-3xl font-extrabold text-gray-900">Pending Submissions</h1>
+      
+      {loading ? <p>Loading...</p> : (
+        <div className="space-y-6">
+          {submissions.length === 0 && <p className="text-gray-500">No pending submissions.</p>}
+          {submissions.map(sub => (
+            <div key={sub.id} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm relative">
+              <div className="flex justify-between border-b pb-4 mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">{sub.title}</h3>
+                  <p className="text-xs text-gray-500">Submitted: {sub.submittedAt?.toDate().toLocaleString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800 h-fit">
+                    {sub.status || 'Pending'}
+                    </span>
+                    <button 
+                        onClick={() => copyToClipboard(sub)}
+                        className="px-3 py-1 text-xs font-bold rounded bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                    >
+                        Copy Code
+                    </button>
+                </div>
+              </div>
+              
+              <div className="grid gap-4 text-sm text-gray-700">
+                <div><span className="font-bold">Summary:</span> {sub.summary}</div>
+                <div><span className="font-bold">Symptoms:</span> {Array.isArray(sub.symptoms) ? sub.symptoms.join(', ') : sub.symptoms}</div>
+                <div className="bg-gray-50 p-3 rounded">
+                  <span className="font-bold block mb-1">Protocol:</span>
+                  <pre className="whitespace-pre-wrap font-sans">{sub.protocol}</pre>
+                </div>
+                <div><span className="font-bold">Sample Day:</span> {sub.sampleDay}</div>
+                {sub.sourceLink && (
+                  <div><span className="font-bold">Source:</span> <a href={sub.sourceLink} target="_blank" rel="noreferrer" className="text-blue-600 underline">{sub.sourceLink}</a></div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ---------------------------------------
    Header
 --------------------------------------- */
-function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
+function Header({ user, onGoHome, onSubmitMethod, onFeedback, isAdmin, onOpenAdmin }) {
   const [busy, setBusy] = useState(false);
 
   const doGoogleSignIn = async () => {
@@ -573,6 +550,17 @@ function Header({ user, onGoHome, onSubmitMethod, onFeedback }) {
           >
             Feedback
           </button>
+          
+          {/* Admin Button - Only visible to Admins */}
+          {user && isAdmin && (
+            <button
+                onClick={onOpenAdmin}
+                className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-bold text-red-600 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+                Admin Panel
+            </button>
+          )}
+
           {user ? (
             <button
               disabled={busy}
@@ -1335,6 +1323,7 @@ function GeminiAdvisor({ methods, onClose }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
+               // Note: Use 'system_instruction' based on current API docs, 'systemInstruction' may be deprecated
                system_instruction: { parts: [{ text: systemPrompt }] },
                contents: [{ role: 'user', parts: [{ text: userQuery }] }],
             }),
@@ -1514,6 +1503,7 @@ export default function App() {
   const handleFeedback = () => setCurrentPage('feedback');
   const handleOpenAdvisor = () => setIsAdvisorOpen(true);
   const handleCloseAdvisor = () => setIsAdvisorOpen(false);
+  const handleOpenAdmin = () => setCurrentPage('admin');
   
   const handleVote = async (id, voteType) => {
     if (!auth || !db) return;
@@ -1587,6 +1577,8 @@ export default function App() {
         return <SubmitMethodPage onBack={handleBack} user={user} />;
       case 'feedback': 
         return <FeedbackPage onBack={handleBack} user={user} />;
+      case 'admin': 
+        return <AdminDashboard onBack={handleBack} />;
       case 'list': 
       default: 
         return <MethodListPage 
@@ -1604,7 +1596,14 @@ export default function App() {
   return (
     <ErrorBoundary>
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
-          <Header user={user} onGoHome={handleGoHome} onSubmitMethod={handleSubmitMethod} onFeedback={handleFeedback} />
+          <Header 
+            user={user} 
+            onGoHome={handleGoHome} 
+            onSubmitMethod={handleSubmitMethod} 
+            onFeedback={handleFeedback} 
+            isAdmin={isAdmin} 
+            onOpenAdmin={handleOpenAdmin} 
+          />
           {showFirebaseNotice && (
             <div className="mx-auto mt-4 mb-4 max-w-6xl rounded-md border border-yellow-400 bg-yellow-50 px-4 py-3 text-sm text-yellow-900" role="alert">
                 ⚠️ **Limited Mode:** Firebase not configured. Features disabled. Check Netlify env vars.
